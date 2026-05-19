@@ -5,7 +5,6 @@
 
 This Privacy Policy explains what information CourierMap ("we", "us") collects, how we use it, and the choices you have. By using the app you confirm that you have read and understood this policy.
 
-> A more detailed, engineering-facing inventory lives at [`docs/PRIVACY.md`](../docs/PRIVACY.md). This document is the user-facing simplified version; keep the two in sync.
 
 ## Information we collect
 
