@@ -1,10 +1,11 @@
 # CourierMap Privacy Policy
 
-**Effective date:** 19 May 2026
-**Version:** 2 (beta)
+**Effective date:** 20 May 2026
+**Version:** 3 (beta)
 
 This Privacy Policy explains what information CourierMap ("we", "us") collects, how we use it, and the choices you have. By using the app you confirm that you have read and understood this policy.
 
+> A more detailed, engineering-facing inventory lives at [`docs/PRIVACY.md`](../docs/PRIVACY.md). This document is the user-facing simplified version; keep the two in sync.
 
 ## Information we collect
 
@@ -36,14 +37,14 @@ This Privacy Policy explains what information CourierMap ("we", "us") collects, 
 
 ## Retention
 
-Your contributions remain until you delete them from the Contributions tab. Verification screenshots are retained while your verification claim is active and can be removed via your profile when a claim is closed. A full account deletion flow is on our v1.1 roadmap — in the meantime, email us to request account deletion and we will remove your account and contributions within a reasonable time.
+Your contributions remain until you delete them from the Contributions tab. Verification screenshots are retained while your verification claim is active and can be removed via your profile when a claim is closed. You can delete your entire account at any time from **Profile → Delete account**: this permanently removes your account, ratings, comments, pickup tips, place suggestions, bug reports, verification claim, and any uploaded screenshots. Community platform tags you contributed (which delivery apps a shop is on) are kept but de-identified so the shop coverage data isn't lost. If you'd prefer email assistance, write to us and we'll process the deletion manually within a reasonable time.
 
 ## Your rights
 
-- View and delete your contributions from the Contributions tab.
+- View and delete individual contributions from the Contributions tab.
 - Change your email or password from the Profile tab.
 - Withdraw a driver verification claim from the Profile tab.
-- Request a full export or deletion of your account by email.
+- Delete your entire account in-app from Profile → Delete account, or by emailing us.
 
 ## Security
 
