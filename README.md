@@ -52,8 +52,8 @@ CourierMap is currently in **closed testing** on Google Play. Here's how to get 
 
 ## Privacy & Legal
 
-- [Privacy Policy](./privacy-policy.html)
-- [Terms of Service](./terms.html)
+- [Privacy Policy](./PRIVACY_POLICY)
+- [Terms of Service](./TERMS)
 
 ---
 
