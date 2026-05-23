@@ -5,8 +5,6 @@
 
 This Privacy Policy explains what information CourierMap ("we", "us") collects, how we use it, and the choices you have. By using the app you confirm that you have read and understood this policy.
 
-> A more detailed, engineering-facing inventory lives at [`docs/PRIVACY.md`](../docs/PRIVACY.md). This document is the user-facing simplified version; keep the two in sync.
-
 ## Information we collect
 
 - **Account:** your email address and a hashed password (managed by Supabase Auth). If you sign in with Google we receive your email and Google account ID only.
