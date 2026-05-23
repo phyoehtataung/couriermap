@@ -30,7 +30,7 @@ place, pinned to the actual shop on a map.
 
 ## Who it's for
 
-Rideshare and delivery drivers (Uber, DoorDash, Menulog, and others) who want to make
+Rideshare and delivery drivers (Uber, DoorDash, HungryPanda, and others) who want to make
 faster, smarter decisions at pickup. Ratings are contributed by drivers, for drivers.
 
 ---
