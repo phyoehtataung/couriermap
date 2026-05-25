@@ -1,15 +1,15 @@
 # CourierMap Privacy Policy
 
-**Effective date:** 20 May 2026
-**Version:** 3 (beta)
+**Effective date:** 26 May 2026
+**Version:** 4 (beta)
 
 This Privacy Policy explains what information CourierMap ("we", "us") collects, how we use it, and the choices you have. By using the app you confirm that you have read and understood this policy.
 
 ## Information we collect
 
 - **Account:** your email address and a hashed password (managed by Supabase Auth). If you sign in with Google we receive your email and Google account ID only.
-- **Display name and avatar** you choose to set.
-- **Driver verification:** a screenshot you upload of your rideshare or delivery driver profile and the driver name parsed from it. When you start verification we request access to your device's photo library (via the operating system's standard permission prompt) so you can pick the screenshot; we only read the image you select. Screenshots are stored in a private, owner-only Supabase Storage bucket. We use Google Cloud Vision (running inside our Supabase Edge Function) to OCR the screenshot; the image is sent to Google solely for that purpose and is not retained by Google for training.
+- **Display name** you choose to set.
+- **Driver verification:** a screenshot you upload of your rideshare or delivery driver profile and the driver name parsed from it. When you start verification we request access to your device's photo library (via the operating system's standard permission prompt) so you can pick the screenshot; we only read the image you select. Screenshots are stored in a private, owner-only Supabase Storage bucket. We use Google Cloud Vision (running inside our Supabase Edge Function) to OCR the screenshot; the image is sent to Google Cloud Vision solely for that purpose and is not retained by Google for training. We then send only the short name text extracted by the OCR (never the screenshot) to Google's Gemini AI to confirm it looks like a person's name rather than an app menu label.
 - **Device location (on-device only):** when you tap the Locate Me button we request your device location through the operating system's standard permission prompt and use the coordinate to centre the map on your position. The coordinate is used on-device only and is not transmitted to our servers or any third party.
 - **Contributions:** ratings, comments, pickup guides, platform tags, place suggestions and bug reports you create are stored under your account and visible to other users.
 - **Device-local data:** your last map centre, downloaded region cache, theme preference and other UI settings stored locally on the device via AsyncStorage and the device filesystem. These do not leave the device.
@@ -30,7 +30,7 @@ This Privacy Policy explains what information CourierMap ("we", "us") collects, 
 ## Third parties
 
 - **Supabase** — authentication, database, storage. See supabase.com/privacy.
-- **Google** — OAuth sign-in (when you choose it) and Cloud Vision OCR (when you upload a driver screenshot). See policies.google.com/privacy.
+- **Google** — OAuth sign-in (when you choose it), Cloud Vision OCR (when you upload a driver screenshot), and Gemini AI (to check the OCR'd name is a real name and not a menu label — only the short name text is sent, never the screenshot). See policies.google.com/privacy.
 - **Map tile providers** — we self-host our basemap tiles, so map pan/zoom does not call any third party. Our maps are built from **© OpenStreetMap contributors** data, used under the Open Database License (ODbL); attribution is shown in-app.
 
 ## Retention
@@ -46,7 +46,7 @@ Your contributions remain until you delete them from the Contributions tab. Veri
 
 ## Security
 
-We use HTTPS for all network traffic, Supabase Row-Level Security to scope database access, and store driver-verification screenshots in a private, owner-only bucket. No system is perfectly secure; you accept residual risk by using the app.
+We use HTTPS for all network traffic (encrypted in transit), Supabase Row-Level Security to scope database access, Supabase's built-in at-rest encryption for stored objects, and store driver-verification screenshots in a private, owner-only bucket. No system is perfectly secure; you accept residual risk by using the app.
 
 ## Children
 

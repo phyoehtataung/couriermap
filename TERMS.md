@@ -1,7 +1,7 @@
 # CourierMap Terms of Service
 
-**Effective date:** 16 May 2026
-**Version:** 1 (beta)
+**Effective date:** 26 May 2026
+**Version:** 2 (beta)
 
 These Terms govern your use of the CourierMap mobile application. By tapping "I Agree", or by using the app, you agree to be bound by these Terms.
 
@@ -28,7 +28,7 @@ You retain ownership of the content you create in the app. You grant us a worldw
 
 ## Driver verification
 
-Verification is best-effort and based on screenshots that we OCR. We may approve, reject, or revoke a verification claim at our discretion. Verification status is not a guarantee that any other user is who they say they are.
+Verification is best-effort and relies on automated text recognition and AI to read the driver name from screenshots you upload. This automated detection may be imperfect. We may approve, reject, or revoke a verification claim at our discretion. Verification status is not a guarantee that any other user is who they say they are.
 
 ## No warranty
 
