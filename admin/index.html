@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CourierMap Admin</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --text:#14181d; --muted:#67707b; --line:#e3e6ea;
+    --accent:#2563eb; --danger:#dc2626; --ok:#16a34a; --warn:#d97706; --chipbg:#eceff3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#101418; --card:#1a2027; --text:#e8eaed; --muted:#98a2ad; --line:#2a323c;
+      --accent:#60a5fa; --danger:#f87171; --ok:#4ade80; --warn:#fbbf24; --chipbg:#242c35;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:16px 16px 64px; }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  header .who { color:var(--muted); font-size:13px; }
+  .hidden { display:none !important; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px; margin-bottom:10px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .rowline { margin:4px 0; overflow-wrap:anywhere; }
+  .body-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0; }
+  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--text);
+           border-radius:8px; padding:6px 12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger  { color:var(--danger); border-color:var(--danger); }
+  button.ok      { color:var(--ok); border-color:var(--ok); }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .tabs, .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .tabs button.active, .chips button.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .badge { display:inline-block; min-width:18px; padding:0 5px; margin-left:6px; border-radius:9px;
+           background:var(--danger); color:#fff; font-size:11px; line-height:18px; text-align:center; }
+  .tabs button.active .badge { background:rgba(255,255,255,.3); }
+  .tag { display:inline-block; background:var(--chipbg); border-radius:6px; padding:1px 7px;
+         font-size:12px; margin-right:6px; }
+  .tag.warn { color:var(--warn); } .tag.danger { color:var(--danger); } .tag.ok { color:var(--ok); }
+  .shot { max-width:100%; max-height:420px; border-radius:8px; border:1px solid var(--line); margin-top:8px; display:block; }
+  #login { max-width:340px; margin:12vh auto 0; }
+  #login input { width:100%; font:inherit; padding:9px 11px; margin-bottom:10px; border-radius:8px;
+                 border:1px solid var(--line); background:var(--card); color:var(--text); }
+  #login button { width:100%; margin-bottom:8px; }
+  .err { color:var(--danger); font-size:13px; margin:6px 0; min-height:18px; }
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--danger);
+           color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; max-width:90vw; }
+  .center { text-align:center; color:var(--muted); padding:24px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="login" class="hidden">
+    <h1>CourierMap Admin</h1>
+    <form id="loginForm">
+      <input id="email" type="email" placeholder="Email" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+      <div id="loginErr" class="err"></div>
+      <button class="primary" type="submit">Sign in</button>
+    </form>
+    <button id="googleBtn" type="button">Continue with Google</button>
+  </div>
+
+  <div id="notAdmin" class="hidden">
+    <h1>Not an admin</h1>
+    <p class="muted">This account has no admin access.</p>
+    <button id="signOut2">Sign out</button>
+  </div>
+
+  <div id="app" class="hidden">
+    <header>
+      <h1>CourierMap Admin</h1>
+      <span class="who" id="who"></span>
+      <button id="refreshBtn" title="Refresh">&#8635;</button>
+      <button id="signOut">Sign out</button>
+    </header>
+    <div class="tabs" id="tabs"></div>
+    <div class="chips" id="chips"></div>
+    <div id="list"></div>
+    <div class="center hidden" id="empty">Nothing here.</div>
+    <div class="center hidden" id="loading">Loading…</div>
+    <div class="actions" style="justify-content:center">
+      <button id="moreBtn" class="hidden">Load more</button>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+// Publishable key — public by design (same values ship inside the app bundle).
+const SUPABASE_URL = "https://cscbtkjtbcgduiwfckgr.supabase.co";
+const SUPABASE_KEY = "sb_publishable_wNo2s6g61OxTDdWSBWzkzg_V88acVEi";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const PAGE = 30;
+const TABS = {
+  suggestions: { label:"Suggestions", badge:"suggestions_pending", rpc:"admin_list_suggestions",
+                 statuses:["pending","approved","rejected","all"], def:"pending" },
+  claims:      { label:"Claims", badge:"claims_pending", rpc:"admin_list_claims",
+                 statuses:["pending","approved","rejected","auto_approved","withdrawn","all"], def:"pending" },
+  reports:     { label:"Reports", badge:"reports_open", rpc:"admin_list_reports",
+                 statuses:["open","resolved_hide","resolved_keep","all"], def:"open" },
+  bugs:        { label:"Bugs", badge:"bugs_open", rpc:"admin_list_bug_reports",
+                 statuses:["open","resolved","closed","all"], def:"open" },
+};
+const state = { tab:"suggestions", filter:{}, items:[], counts:{}, busy:false };
+for (const k in TABS) state.filter[k] = TABS[k].def;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+  (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const when = (ts) => ts ? new Date(ts).toLocaleString() : "";
+const person = (name, handle) =>
+  esc(name || "(no name)") + (handle ? ' <span class="muted">@' + esc(handle) + "</span>" : "");
+
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), 5000);
+}
+
+async function rpc(fn, args) {
+  const { data, error } = await db.rpc(fn, args || {});
+  if (error) throw error;
+  return data;
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+function show(view) {
+  for (const id of ["login", "notAdmin", "app"]) $(id).classList.toggle("hidden", id !== view);
+}
+
+let entering = false;
+async function enter(session) {
+  if (entering) return;
+  entering = true;
+  try {
+    $("who").textContent = session.user.email || "";
+    try {
+      state.counts = await rpc("admin_get_counts");
+    } catch (e) {
+      if (e.code === "42501" || /admin only/i.test(e.message || "")) { show("notAdmin"); return; }
+      toast(e.message || "Failed to load counts"); // transient (offline etc.) — stay in
+    }
+    show("app");
+    renderTabs();
+    await loadTab(true);
+  } finally {
+    entering = false;
+  }
+}
+
+async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) enter(session); else show("login");
+  db.auth.onAuthStateChange((event, s) => {
+    if (event === "SIGNED_OUT") show("login");
+    else if (event === "SIGNED_IN" && s && $("app").classList.contains("hidden")) enter(s);
+  });
+}
+
+$("loginForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("loginErr").textContent = "";
+  const { data, error } = await db.auth.signInWithPassword({
+    email: $("email").value.trim(), password: $("password").value,
+  });
+  if (error) { $("loginErr").textContent = error.message; return; }
+  enter(data.session);
+});
+$("googleBtn").addEventListener("click", () => db.auth.signInWithOAuth({
+  provider: "google",
+  options: { redirectTo: location.origin + location.pathname },
+}));
+const signOut = () => db.auth.signOut();
+$("signOut").addEventListener("click", signOut);
+$("signOut2").addEventListener("click", signOut);
+
+// ── Tabs / filters / list ───────────────────────────────────────────────────
+function renderTabs() {
+  $("tabs").innerHTML = Object.entries(TABS).map(([k, t]) => {
+    const n = state.counts[t.badge] | 0;
+    return '<button data-tab="' + k + '"' + (k === state.tab ? ' class="active"' : "") + ">" +
+      t.label + (n ? '<span class="badge">' + n + "</span>" : "") + "</button>";
+  }).join("");
+  $("chips").innerHTML = TABS[state.tab].statuses.map((s) =>
+    '<button data-chip="' + s + '"' + (s === state.filter[state.tab] ? ' class="active"' : "") + ">" +
+    s.replace("_", " ") + "</button>").join("");
+}
+$("tabs").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-tab]");
+  if (!b) return;
+  state.tab = b.dataset.tab;
+  renderTabs(); loadTab(true);
+});
+$("chips").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-chip]");
+  if (!b) return;
+  state.filter[state.tab] = b.dataset.chip;
+  renderTabs(); loadTab(true);
+});
+$("moreBtn").addEventListener("click", () => loadTab(false));
+$("refreshBtn").addEventListener("click", () => refresh());
+
+async function refresh() {
+  try { state.counts = await rpc("admin_get_counts"); } catch (e) { toast(e.message); }
+  renderTabs();
+  await loadTab(true);
+}
+
+async function loadTab(reset) {
+  const t = TABS[state.tab], f = state.filter[state.tab];
+  if (reset) { state.items = []; $("list").innerHTML = ""; }
+  $("loading").classList.remove("hidden");
+  $("empty").classList.add("hidden");
+  $("moreBtn").classList.add("hidden");
+  try {
+    const last = state.items[state.items.length - 1];
+    const data = await rpc(t.rpc, {
+      p_status: f === "all" ? null : f,
+      p_limit: PAGE,
+      p_before: reset ? null : (last ? last.created_at : null),
+    });
+    const items = (data && data.items) || [];
+    state.items = state.items.concat(items);
+    renderList();
+    $("moreBtn").classList.toggle("hidden", items.length < PAGE);
+    $("empty").classList.toggle("hidden", state.items.length > 0);
+  } catch (e) {
+    toast(e.message || "Failed to load");
+  } finally {
+    $("loading").classList.add("hidden");
+  }
+}
+
+function statusTag(s) {
+  const cls = /pending|open/.test(s) ? "warn" : /approved|resolved|resolved_keep/.test(s) ? "ok"
+            : /rejected|closed|resolved_hide/.test(s) ? "danger" : "";
+  return '<span class="tag ' + cls + '">' + esc(s) + "</span>";
+}
+const shotBtn = (url, label) => url
+  ? '<button data-act="shot" data-url="' + esc(url) + '">' + label + "</button>" : "";
+
+const renderers = {
+  suggestions(it) {
+    const flags =
+      (it.new_place ? '<span class="tag ok">new place</span>' : "") +
+      (it.permanently_closed ? '<span class="tag danger">permanently closed</span>' : "") +
+      (it.moved_to_new_address ? '<span class="tag warn">moved</span>' : "");
+    const fields = ["name", "address", "opening_hours"]
+      .filter((k) => it[k])
+      .map((k) => '<div class="rowline"><b>' + k.replace("_", " ") + ":</b> " + esc(it[k]) + "</div>")
+      .join("");
+    return '<div class="card">' +
+      statusTag(it.status) + flags +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="rowline muted">' +
+      (it.place_id
+        ? "Edit for <b>" + esc(it.place_name || it.place_id) + "</b>" +
+          (it.place_address ? " — " + esc(it.place_address) : "")
+        : "New place submission") +
+      "</div>" + fields +
+      '<div class="rowline muted">By ' + person(it.user_name, it.handle) + "</div>" +
+      '<div class="actions">' +
+      (it.status === "pending"
+        ? '<button class="ok" data-act="sugg" data-id="' + it.id + '" data-status="approved">Approve</button>' +
+          '<button class="danger" data-act="sugg" data-id="' + it.id + '" data-status="rejected">Reject</button>'
+        : '<button data-act="sugg" data-id="' + it.id + '" data-status="pending">Reopen</button>') +
+      "</div></div>";
+  },
+  claims(it) {
+    return '<div class="card">' +
+      statusTag(it.status) +
+      (it.defends_claim_id ? '<span class="tag">defense</span>' : "") +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="rowline"><b>Driver name:</b> ' + esc(it.driver_name) + "</div>" +
+      '<div class="rowline">Claimant: ' + person(it.claimant_name, it.claimant_handle) +
+      ' <span class="tag">' + esc(it.claimant_status || "?") + "</span></div>" +
+      (it.conflict_name
+        ? '<div class="rowline">Conflicts with: ' + person(it.conflict_name, it.conflict_handle) + "</div>" : "") +
+      (it.admin_notes ? '<div class="rowline muted">Notes: ' + esc(it.admin_notes) + "</div>" : "") +
+      '<div class="actions">' +
+      shotBtn(it.screenshot_url, "Claim screenshot") +
+      shotBtn(it.conflict_screenshot_url, "Incumbent's verified screenshot") +
+      shotBtn(it.defense_screenshot_url, "Defense screenshot") +
+      (it.status === "pending"
+        ? '<button class="ok" data-act="claim" data-id="' + it.id + '" data-approve="1">Approve</button>' +
+          '<button class="danger" data-act="claim" data-id="' + it.id + '" data-approve="">Reject</button>'
+        : "") +
+      "</div></div>";
+  },
+  reports(it) {
+    const gone = it.target_deleted;
+    return '<div class="card">' +
+      statusTag(it.status) +
+      '<span class="tag">' + esc(it.target_kind).replace("_", " ") + "</span>" +
+      (it.open_count > 1 ? '<span class="tag warn">' + it.open_count + " open reports</span>" : "") +
+      (it.target_hidden ? '<span class="tag danger">hidden</span>' : "") +
+      (gone ? '<span class="tag">deleted</span>' : "") +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="rowline"><b>' + esc(it.reason) + "</b>" +
+      (it.detail ? ' — <span class="muted">' + esc(it.detail) + "</span>" : "") + "</div>" +
+      (gone ? '<div class="body-text muted">[content deleted]</div>'
+            : '<div class="body-text">' + esc(it.target_text || "(no text)") + "</div>") +
+      '<div class="rowline muted">By ' + person(it.author_name, it.author_handle) +
+      (it.place_name ? " at " + esc(it.place_name) : "") +
+      " · reported by " + person(it.reporter_name, it.reporter_handle) + "</div>" +
+      '<div class="actions">' +
+      (it.status === "open" && !gone
+        ? '<button class="danger" data-act="report" data-kind="' + esc(it.target_kind) +
+          '" data-id="' + it.target_id + '" data-hide="1">Hide content</button>' +
+          '<button class="ok" data-act="report" data-kind="' + esc(it.target_kind) +
+          '" data-id="' + it.target_id + '" data-hide="">Keep (unhide)</button>'
+        : "") +
+      "</div></div>";
+  },
+  bugs(it) {
+    return '<div class="card">' +
+      statusTag(it.status) +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="body-text">' + esc(it.description) + "</div>" +
+      '<div class="rowline muted">By ' + person(it.user_name, it.handle) + "</div>" +
+      '<div class="actions">' +
+      (it.status === "open"
+        ? '<button class="ok" data-act="bug" data-id="' + it.id + '" data-status="resolved">Resolve</button>' +
+          '<button data-act="bug" data-id="' + it.id + '" data-status="closed">Close</button>'
+        : '<button data-act="bug" data-id="' + it.id + '" data-status="open">Reopen</button>') +
+      "</div></div>";
+  },
+};
+
+function renderList() {
+  $("list").innerHTML = state.items.map(renderers[state.tab]).join("");
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+async function act(fn, args, confirmMsg) {
+  if (state.busy) return;
+  if (confirmMsg && !window.confirm(confirmMsg)) return;
+  state.busy = true;
+  try {
+    await rpc(fn, args);
+    await refresh();
+  } catch (e) {
+    toast(e.message || "Action failed");
+  } finally {
+    state.busy = false;
+  }
+}
+
+$("list").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-act]");
+  if (!b) return;
+  const d = b.dataset;
+  if (d.act === "sugg") {
+    act("admin_set_suggestion_status", { p_id: d.id, p_status: d.status },
+        "Set suggestion to " + d.status + "? (notifies the suggester)");
+  } else if (d.act === "claim") {
+    const verb = d.approve ? "APPROVE" : "REJECT";
+    const notes = window.prompt(verb + " this claim — optional admin note (Cancel aborts):", "");
+    if (notes === null) return;
+    act("admin_decide_claim", { p_id: d.id, p_approve: !!d.approve, p_notes: notes || null });
+  } else if (d.act === "report") {
+    act("admin_resolve_reports", { p_target_kind: d.kind, p_target_id: d.id, p_hide: !!d.hide },
+        d.hide ? "Hide this content and resolve all its open reports?"
+               : "Keep (un-hide) this content and resolve all its open reports?");
+  } else if (d.act === "bug") {
+    act("admin_set_bug_report_status", { p_id: d.id, p_status: d.status });
+  } else if (d.act === "shot") {
+    // screenshot_url is a public-style URL into the PRIVATE driver-screenshots
+    // bucket — extract the object path and sign it (admin storage policy).
+    const m = /driver-screenshots\/(.+)$/.exec(d.url);
+    if (!m) { toast("Unrecognized screenshot URL"); return; }
+    b.disabled = true;
+    const { data, error } = await db.storage.from("driver-screenshots")
+      .createSignedUrl(decodeURIComponent(m[1]), 3600);
+    b.disabled = false;
+    if (error) { toast(error.message); return; }
+    const img = document.createElement("img");
+    img.className = "shot";
+    img.src = data.signedUrl;
+    b.closest(".card").appendChild(img);
+    b.remove();
+  }
+});
+
+init();
+</script>
+</body>
+</html>

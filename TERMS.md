@@ -1,7 +1,7 @@
 # CourierMap Terms of Service
 
-**Effective date:** 26 May 2026
-**Version:** 2 (beta)
+**Effective date:** 27 June 2026
+**Version:** 3 (beta)
 
 These Terms govern your use of the CourierMap mobile application. By tapping "I Agree", or by using the app, you agree to be bound by these Terms.
 
@@ -17,14 +17,18 @@ CourierMap is in beta. The app may contain bugs, change without notice, or have 
 
 ## Acceptable use
 
-- Do not post unlawful, harassing, hateful, or deceptive content in ratings, comments, pickup guides, place suggestions, or bug reports.
+- Do not post unlawful, harassing, hateful, or deceptive content in ratings, comments, pickup guides, replies, place suggestions, or bug reports, and do not use @mentions, votes, or reports to harass, spam, impersonate, or target other users.
 - Do not attempt to scrape, reverse-engineer, or overload our backend.
 - Do not upload anyone else's driver profile screenshot or attempt to claim a verified-driver status that is not yours. Impostor claims can lead to revocation and account suspension.
 - Respect the terms of service of any third-party platform you reference (Uber, DoorDash, etc).
 
 ## User content
 
-You retain ownership of the content you create in the app. You grant us a worldwide, non-exclusive licence to host, store, and display that content within CourierMap to other users for the purpose of operating the service. You can revoke this licence at any time by deleting the content.
+You retain ownership of the content you create in the app. Your ratings, comments, pickup guides and replies are displayed publicly to other users, including in a global feed, alongside your display name and @handle. You grant us a worldwide, non-exclusive licence to host, store, display, and — at another user's request — machine-translate and cache that content within CourierMap for the purpose of operating the service. You can revoke this licence at any time by deleting the content.
+
+## Moderation, reporting and blocking
+
+Content you post is screened by automated moderation and may be reviewed if reported. Any user can report content or block another user. We may hide, remove, or restrict content or accounts that breach these Terms or that are reported by multiple users, with or without notice. These tools are provided to help keep the community safe, but we do not guarantee any particular moderation outcome.
 
 ## Driver verification
 
