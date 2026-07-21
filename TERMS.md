@@ -1,19 +1,23 @@
 # CourierMap Terms of Service
 
-**Effective date:** 27 June 2026
-**Version:** 3 (beta)
+**Effective date:** 21 July 2026
+**Version:** 4 (beta)
 
 These Terms govern your use of the CourierMap mobile application. By tapping "I Agree", or by using the app, you agree to be bound by these Terms.
 
 ## Beta software
 
-CourierMap is in beta. The app may contain bugs, change without notice, or have brief periods of unavailability. Data you create may be lost in rare cases (we will do our best to avoid this).
+CourierMap is in beta. The app may contain bugs, change without notice, or have brief periods of unavailability. Data you create may be lost in rare cases (we will do our best to avoid this). The map and shop data require a network connection.
 
 ## Eligibility
 
 - You are at least 16 years old.
 - You are using the app for its intended purpose: a personal aid for rideshare and delivery work.
-- Your account information is accurate. You will not impersonate another driver.
+- If you create an account, your account information is accurate. You will not impersonate another driver.
+
+## Accounts and guest use
+
+You may browse the map, shop pages, reviews feed, and comments without an account. Creating an account (email/password or Google) is required to rate shops, post pickup tips, reply, vote, suggest places, report or block users, translate content, verify as a driver, or send a bug report. These Terms apply whether you browse as a guest or while signed in.
 
 ## Acceptable use
 
@@ -24,15 +28,17 @@ CourierMap is in beta. The app may contain bugs, change without notice, or have 
 
 ## User content
 
-You retain ownership of the content you create in the app. Your ratings, comments, pickup guides and replies are displayed publicly to other users, including in a global feed, alongside your display name and @handle. You grant us a worldwide, non-exclusive licence to host, store, display, and — at another user's request — machine-translate and cache that content within CourierMap for the purpose of operating the service. You can revoke this licence at any time by deleting the content.
+You retain ownership of the content you create in the app. Your ratings, comments, pickup guides and replies are displayed publicly to other users — including guests browsing without an account — in a global feed and on shop pages, alongside your display name and @handle. You grant us a worldwide, non-exclusive licence to host, store, display, and — at another user's request — machine-translate and cache that content within CourierMap for the purpose of operating the service. You can revoke this licence at any time by deleting the content.
+
+Shop ratings from all signed-in users count toward the shop's displayed average and rating count. A verified-driver badge is an optional trust signal; it is not required to contribute.
 
 ## Moderation, reporting and blocking
 
-Content you post is screened by automated moderation and may be reviewed if reported. Any user can report content or block another user. We may hide, remove, or restrict content or accounts that breach these Terms or that are reported by multiple users, with or without notice. These tools are provided to help keep the community safe, but we do not guarantee any particular moderation outcome.
+Content you post is screened by automated moderation and may be reviewed if reported. Any signed-in user can report content or block another user. We may hide, remove, or restrict content or accounts that breach these Terms or that are reported by multiple users, with or without notice. These tools are provided to help keep the community safe, but we do not guarantee any particular moderation outcome.
 
 ## Driver verification
 
-Verification is best-effort and relies on automated text recognition and AI to read the driver name from screenshots you upload. This automated detection may be imperfect. We may approve, reject, or revoke a verification claim at our discretion. Verification status is not a guarantee that any other user is who they say they are.
+Verification is optional and best-effort. It relies on automated text recognition and AI to read the driver name from screenshots you upload. This automated detection may be imperfect. We may approve, reject, or revoke a verification claim at our discretion. A verified badge may appear next to your name; verification status is not a guarantee that any other user is who they say they are, and it does not change whether your ratings count toward shop scores.
 
 ## No warranty
 
