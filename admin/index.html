@@ -273,7 +273,9 @@ const renderers = {
     const flags =
       (it.new_place ? '<span class="tag ok">new place</span>' : "") +
       (it.permanently_closed ? '<span class="tag danger">permanently closed</span>' : "") +
-      (it.moved_to_new_address ? '<span class="tag warn">moved</span>' : "");
+      (it.moved_to_new_address ? '<span class="tag warn">moved</span>' : "") +
+      (it.permanently_closed && !it.place_id && it.status === "approved"
+        ? '<span class="tag">shop deleted</span>' : "");
     const fields = ["name", "address", "opening_hours"]
       .filter((k) => it[k])
       .map((k) => '<div class="rowline"><b>' + k.replace("_", " ") + ":</b> " + esc(it[k]) +
@@ -283,6 +285,30 @@ const renderers = {
           : "") +
         "</div>")
       .join("");
+    const canDeleteClosed = it.permanently_closed && it.place_id && !it.new_place
+      && (it.status === "pending" || it.status === "approved");
+    let actions = "";
+    if (it.status === "pending") {
+      if (it.new_place) {
+        actions += '<button class="ok" data-act="newplace" data-id="' + it.id +
+          '">Review location &amp; create&#8230;</button>';
+      } else if (canDeleteClosed) {
+        actions += '<button class="danger" data-act="delclosed" data-id="' + it.id +
+          '">Approve &amp; delete shop</button>';
+      } else {
+        actions += '<button class="ok" data-act="sugg" data-id="' + it.id +
+          '" data-status="approved">Approve</button>';
+      }
+      actions += '<button class="danger" data-act="sugg" data-id="' + it.id +
+        '" data-status="rejected">Reject</button>';
+    } else {
+      actions += '<button data-act="sugg" data-id="' + it.id +
+        '" data-status="pending">Reopen</button>';
+      if (canDeleteClosed) {
+        actions += '<button class="danger" data-act="delclosed" data-id="' + it.id +
+          '">Delete shop</button>';
+      }
+    }
     return '<div class="card">' +
       statusTag(it.status) + flags +
       '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
@@ -290,17 +316,12 @@ const renderers = {
       (it.place_id
         ? "Edit for <b>" + esc(it.place_name || it.place_id) + "</b>" +
           (it.place_address ? " — " + esc(it.place_address) : "")
-        : "New place submission") +
+        : (it.permanently_closed && it.status === "approved"
+            ? "Shop deleted" + (it.name ? " — <b>" + esc(it.name) + "</b>" : "")
+            : "New place submission")) +
       "</div>" + fields +
       '<div class="rowline muted">By ' + person(it.user_name, it.handle) + "</div>" +
-      '<div class="actions">' +
-      (it.status === "pending"
-        ? (it.new_place
-            ? '<button class="ok" data-act="newplace" data-id="' + it.id + '">Review location &amp; create&#8230;</button>'
-            : '<button class="ok" data-act="sugg" data-id="' + it.id + '" data-status="approved">Approve</button>') +
-          '<button class="danger" data-act="sugg" data-id="' + it.id + '" data-status="rejected">Reject</button>'
-        : '<button data-act="sugg" data-id="' + it.id + '" data-status="pending">Reopen</button>') +
-      "</div></div>";
+      '<div class="actions">' + actions + "</div></div>";
   },
   claims(it) {
     return '<div class="card">' +
@@ -481,6 +502,14 @@ $("list").addEventListener("click", async (ev) => {
   if (d.act === "sugg") {
     act("admin_set_suggestion_status", { p_id: d.id, p_status: d.status },
         "Set suggestion to " + d.status + "? (notifies the suggester)");
+  } else if (d.act === "delclosed") {
+    const item = state.items.find((x) => x.id === d.id);
+    const label = (item && (item.place_name || item.name)) || "this shop";
+    act("admin_delete_closed_place", { p_suggestion_id: d.id },
+        'Permanently delete "' + label + '" from the database? ' +
+        "Approves the suggestion (if pending), removes ratings/tips for the shop, " +
+        "and notifies the suggester. The map pin clears after the next tile republish.",
+        "Shop deleted — searchable/tappable now gone; map pin clears on next shops republish.");
   } else if (d.act === "newplace") {
     const item = state.items.find((x) => x.id === d.id);
     if (item) reviewPanel(item, b.closest(".card"));
