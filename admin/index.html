@@ -296,8 +296,8 @@ const renderers = {
         actions += '<button class="danger" data-act="delclosed" data-id="' + it.id +
           '">Approve &amp; delete shop</button>';
       } else {
-        actions += '<button class="ok" data-act="sugg" data-id="' + it.id +
-          '" data-status="approved">Approve</button>';
+        actions += '<button class="ok" data-act="editplace" data-id="' + it.id +
+          '">Review &amp; apply&#8230;</button>';
       }
       actions += '<button class="danger" data-act="sugg" data-id="' + it.id +
         '" data-status="rejected">Reject</button>';
@@ -479,6 +479,116 @@ function reviewPanel(it, card) {
   geocode(); // auto-run on open
 }
 
+// ── Edit-suggestion review panel (apply name/address/hours + optional pin) ─
+function editPanel(it, card) {
+  const old = card.querySelector(".panel");
+  if (old) { old.remove(); return; }
+  const name0 = it.name || it.place_name || "";
+  const addr0 = it.address || it.place_address || "";
+  const hours0 = it.opening_hours != null ? it.opening_hours
+               : (it.place_opening_hours || "");
+  const p = document.createElement("div");
+  p.className = "panel";
+  p.innerHTML =
+    '<div class="muted" style="margin-bottom:6px">Applies to <b>' +
+      esc(it.place_name || it.place_id) + "</b> — search/detail update immediately; " +
+      "name/pin changes land on the map after the next shops republish.</div>" +
+    '<div class="grid">' +
+      '<input class="wide" data-f="name" placeholder="Place name" value="' + esc(name0) + '">' +
+    "</div>" +
+    '<div class="grid">' +
+      '<input class="wide" data-f="address" placeholder="Address" value="' + esc(addr0) + '">' +
+      '<button data-f="geocode">Geocode</button></div>' +
+    '<div class="grid">' +
+      '<input class="wide" data-f="hours" placeholder="Opening hours (OSM)" value="' + esc(hours0) + '">' +
+    "</div>" +
+    '<div class="grid">' +
+      '<input class="coord" data-f="lat" placeholder="lat" inputmode="decimal"' +
+        (it.place_lat != null ? ' value="' + (+it.place_lat).toFixed(6) + '"' : "") + ">" +
+      '<input class="coord" data-f="lon" placeholder="lon" inputmode="decimal"' +
+        (it.place_lon != null ? ' value="' + (+it.place_lon).toFixed(6) + '"' : "") + ">" +
+      '<button data-f="pin">Update pin</button>' +
+      '<span class="muted" data-f="geoinfo" style="flex:1 1 200px">' +
+        (it.moved_to_new_address ? "Moved — geocode the new address (or keep current pin)." : "") +
+      "</span></div>" +
+    '<div class="maps">' +
+      '<div><div class="cap">Pin position (OSM) — saved when lat/lon are set</div>' +
+        '<iframe data-f="osm" loading="lazy"></iframe></div>' +
+      '<div><div class="cap">Google Maps address search — compare</div>' +
+        '<iframe data-f="gmap" loading="lazy"></iframe></div>' +
+    "</div>" +
+    '<div class="actions">' +
+      '<button class="ok" data-f="apply">Apply &amp; approve</button>' +
+      '<a data-f="glink" href="#" target="_blank" rel="noopener">Open in Google Maps &#8599;</a>' +
+    "</div>";
+  card.appendChild(p);
+  const el = (f) => p.querySelector('[data-f="' + f + '"]');
+
+  function setMaps() {
+    const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
+    const addr = el("address").value.trim();
+    if (isFinite(lat) && isFinite(lon)) {
+      el("osm").src = "https://www.openstreetmap.org/export/embed.html?bbox=" +
+        (lon - 0.004) + "%2C" + (lat - 0.0025) + "%2C" + (lon + 0.004) + "%2C" + (lat + 0.0025) +
+        "&layer=mapnik&marker=" + lat + "%2C" + lon;
+    }
+    if (addr) {
+      el("gmap").src = "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&z=16&output=embed";
+      el("glink").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr);
+    }
+  }
+
+  async function geocode() {
+    const addr = el("address").value.trim();
+    if (!addr) { el("geoinfo").textContent = "No address — keep or set lat/lon manually."; return; }
+    el("geoinfo").textContent = "Geocoding…";
+    try {
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=au&q=" +
+        encodeURIComponent(addr));
+      const hits = await res.json();
+      if (!hits.length) {
+        el("geoinfo").textContent = "No geocoder match — keep current pin or set lat/lon manually.";
+        setMaps(); return;
+      }
+      el("lat").value = (+hits[0].lat).toFixed(6);
+      el("lon").value = (+hits[0].lon).toFixed(6);
+      el("geoinfo").textContent = "→ " + hits[0].display_name;
+      setMaps();
+    } catch (e) {
+      el("geoinfo").textContent = "Geocoding failed: " + (e.message || e);
+    }
+  }
+
+  el("geocode").addEventListener("click", geocode);
+  el("pin").addEventListener("click", setMaps);
+  el("apply").addEventListener("click", () => {
+    const name = el("name").value.trim();
+    const latRaw = el("lat").value.trim(), lonRaw = el("lon").value.trim();
+    const lat = parseFloat(latRaw), lon = parseFloat(lonRaw);
+    const hasCoords = latRaw !== "" || lonRaw !== "";
+    if (!name) { toast("Name is required"); return; }
+    if (hasCoords && (!isFinite(lat) || !isFinite(lon))) {
+      toast("Set both lat and lon, or clear both to keep the current pin"); return;
+    }
+    const args = {
+      p_suggestion_id: it.id,
+      p_name: name,
+      p_address: el("address").value.trim() || null,
+      p_opening_hours: el("hours").value.trim() || null,
+      p_lon: hasCoords ? lon : null,
+      p_lat: hasCoords ? lat : null,
+    };
+    const pinNote = hasCoords ? (" @ " + lat + ", " + lon) : " (pin unchanged)";
+    act("admin_apply_edit_suggestion", args,
+        'Apply edit to "' + name + '"' + pinNote + " and approve? (notifies the suggester)",
+        "Edit applied — searchable now; name/pin on the map update after the next shops republish.");
+  });
+
+  setMaps();
+  // Moved / new-address suggestions: refresh the pin from the suggested address.
+  if (it.moved_to_new_address || (it.address && it.address !== it.place_address)) geocode();
+}
+
 // ── Actions ─────────────────────────────────────────────────────────────────
 async function act(fn, args, confirmMsg, successMsg) {
   if (state.busy) return;
@@ -513,6 +623,9 @@ $("list").addEventListener("click", async (ev) => {
   } else if (d.act === "newplace") {
     const item = state.items.find((x) => x.id === d.id);
     if (item) reviewPanel(item, b.closest(".card"));
+  } else if (d.act === "editplace") {
+    const item = state.items.find((x) => x.id === d.id);
+    if (item) editPanel(item, b.closest(".card"));
   } else if (d.act === "claim") {
     const verb = d.approve ? "APPROVE" : "REJECT";
     const notes = window.prompt(verb + " this claim — optional admin note (Cancel aborts):", "");
