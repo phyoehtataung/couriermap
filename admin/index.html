@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>CourierMap Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
   :root {
     --bg:#f6f7f9; --card:#fff; --text:#14181d; --muted:#67707b; --line:#e3e6ea;
@@ -57,7 +59,11 @@
   .maps { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
   .maps > div { flex:1 1 280px; min-width:0; }
   .maps .cap { font-size:12px; color:var(--muted); margin-bottom:3px; }
-  .maps iframe { width:100%; height:280px; border:1px solid var(--line); border-radius:8px; background:var(--chipbg); }
+  .maps iframe, .maps .osm-map {
+    width:100%; height:280px; border:1px solid var(--line); border-radius:8px;
+    background:var(--chipbg); display:block; z-index:0;
+  }
+  .maps .osm-map .leaflet-container { height:100%; width:100%; border-radius:8px; font:inherit; }
   #login { max-width:340px; margin:12vh auto 0; }
   #login input { width:100%; font:inherit; padding:9px 11px; margin-bottom:10px; border-radius:8px;
                  border:1px solid var(--line); background:var(--card); color:var(--text); }
@@ -109,12 +115,74 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 "use strict";
 // Publishable key — public by design (same values ship inside the app bundle).
 const SUPABASE_URL = "https://cscbtkjtbcgduiwfckgr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wNo2s6g61OxTDdWSBWzkzg_V88acVEi";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// CDN Leaflet looks for icons relative to the page URL — pin absolute paths.
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function mountOsmPinMap(container, latInput, lonInput) {
+  const map = L.map(container, { scrollWheelZoom: true });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+    maxZoom: 19,
+  }).addTo(map);
+
+  let marker = null;
+
+  function writeInputs(lat, lon) {
+    latInput.value = (+lat).toFixed(6);
+    lonInput.value = (+lon).toFixed(6);
+  }
+
+  function setPin(lat, lon, opts) {
+    if (!isFinite(lat) || !isFinite(lon)) return;
+    const zoom = (opts && opts.zoom) || Math.max(map.getZoom() || 0, 17);
+    if (marker) {
+      marker.setLatLng([lat, lon]);
+    } else {
+      marker = L.marker([lat, lon], { draggable: true, autoPan: true }).addTo(map);
+      marker.on("dragend", () => {
+        const ll = marker.getLatLng();
+        writeInputs(ll.lat, ll.lng);
+      });
+    }
+    map.setView([lat, lon], zoom);
+    requestAnimationFrame(() => map.invalidateSize());
+  }
+
+  map.on("click", (e) => {
+    writeInputs(e.latlng.lat, e.latlng.lng);
+    setPin(e.latlng.lat, e.latlng.lng);
+  });
+
+  map.setView([-33.8688, 151.2093], 12); // Sydney until coords land
+  requestAnimationFrame(() => map.invalidateSize());
+
+  return {
+    setPin,
+    destroy() { map.remove(); },
+  };
+}
+
+function closeReviewPanel(card) {
+  const old = card.querySelector(".panel");
+  if (!old) return false;
+  if (old._osmMap) { old._osmMap.destroy(); old._osmMap = null; }
+  old.remove();
+  return true;
+}
 
 const PAGE = 30;
 const TABS = {
@@ -393,8 +461,7 @@ const CATEGORIES = ["restaurant", "cafe", "fast_food", "bar", "pub", "takeaway",
                     "food_court", "supermarket", "convenience"];
 
 function reviewPanel(it, card) {
-  const old = card.querySelector(".panel");
-  if (old) { old.remove(); return; } // toggle closed
+  if (closeReviewPanel(card)) return; // toggle closed
   const p = document.createElement("div");
   p.className = "panel";
   p.innerHTML =
@@ -412,8 +479,8 @@ function reviewPanel(it, card) {
       '<button data-f="pin">Update pin</button>' +
       '<span class="muted" data-f="geoinfo" style="flex:1 1 200px"></span></div>' +
     '<div class="maps">' +
-      '<div><div class="cap">Geocoded position (OSM) — this is what gets saved</div>' +
-        '<iframe data-f="osm" loading="lazy"></iframe></div>' +
+      '<div><div class="cap">OSM pin (saved) — drag or click to correct geocode drift</div>' +
+        '<div class="osm-map" data-f="osm"></div></div>' +
       '<div><div class="cap">Google Maps address search — compare</div>' +
         '<iframe data-f="gmap" loading="lazy"></iframe></div>' +
     "</div>" +
@@ -423,15 +490,13 @@ function reviewPanel(it, card) {
     "</div>";
   card.appendChild(p);
   const el = (f) => p.querySelector('[data-f="' + f + '"]');
+  const osmMap = mountOsmPinMap(el("osm"), el("lat"), el("lon"));
+  p._osmMap = osmMap;
 
   function setMaps() {
     const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
     const addr = el("address").value.trim();
-    if (isFinite(lat) && isFinite(lon)) {
-      el("osm").src = "https://www.openstreetmap.org/export/embed.html?bbox=" +
-        (lon - 0.004) + "%2C" + (lat - 0.0025) + "%2C" + (lon + 0.004) + "%2C" + (lat + 0.0025) +
-        "&layer=mapnik&marker=" + lat + "%2C" + lon;
-    }
+    if (isFinite(lat) && isFinite(lon)) osmMap.setPin(lat, lon, { zoom: 17 });
     if (addr) {
       el("gmap").src = "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&z=16&output=embed";
       el("glink").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr);
@@ -440,14 +505,14 @@ function reviewPanel(it, card) {
 
   async function geocode() {
     const addr = el("address").value.trim();
-    if (!addr) { el("geoinfo").textContent = "No address — set lat/lon manually."; return; }
+    if (!addr) { el("geoinfo").textContent = "No address — drag the pin or set lat/lon."; return; }
     el("geoinfo").textContent = "Geocoding…";
     try {
       const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=au&q=" +
         encodeURIComponent(addr));
       const hits = await res.json();
       if (!hits.length) {
-        el("geoinfo").textContent = "No geocoder match — set lat/lon manually or refine the address.";
+        el("geoinfo").textContent = "No geocoder match — drag the pin or type lat/lon.";
         setMaps(); return;
       }
       el("lat").value = (+hits[0].lat).toFixed(6);
@@ -466,7 +531,7 @@ function reviewPanel(it, card) {
     const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
     if (!name) { toast("Name is required"); return; }
     if (!cat) { toast("Pick a category"); return; }
-    if (!isFinite(lat) || !isFinite(lon)) { toast("Set lat/lon (geocode or type them)"); return; }
+    if (!isFinite(lat) || !isFinite(lon)) { toast("Set lat/lon (geocode, drag pin, or type them)"); return; }
     act("admin_approve_new_place", {
       p_suggestion_id: it.id, p_name: name, p_category: cat,
       p_address: el("address").value.trim() || null,
@@ -481,8 +546,7 @@ function reviewPanel(it, card) {
 
 // ── Edit-suggestion review panel (apply name/address/hours + optional pin) ─
 function editPanel(it, card) {
-  const old = card.querySelector(".panel");
-  if (old) { old.remove(); return; }
+  if (closeReviewPanel(card)) return;
   const name0 = it.name || it.place_name || "";
   const addr0 = it.address || it.place_address || "";
   const hours0 = it.opening_hours != null ? it.opening_hours
@@ -509,11 +573,11 @@ function editPanel(it, card) {
         (it.place_lon != null ? ' value="' + (+it.place_lon).toFixed(6) + '"' : "") + ">" +
       '<button data-f="pin">Update pin</button>' +
       '<span class="muted" data-f="geoinfo" style="flex:1 1 200px">' +
-        (it.moved_to_new_address ? "Moved — geocode the new address (or keep current pin)." : "") +
+        (it.moved_to_new_address ? "Moved — geocode the new address (or drag the pin)." : "") +
       "</span></div>" +
     '<div class="maps">' +
-      '<div><div class="cap">Pin position (OSM) — saved when lat/lon are set</div>' +
-        '<iframe data-f="osm" loading="lazy"></iframe></div>' +
+      '<div><div class="cap">OSM pin — drag or click to nudge; saved when lat/lon are set</div>' +
+        '<div class="osm-map" data-f="osm"></div></div>' +
       '<div><div class="cap">Google Maps address search — compare</div>' +
         '<iframe data-f="gmap" loading="lazy"></iframe></div>' +
     "</div>" +
@@ -523,15 +587,13 @@ function editPanel(it, card) {
     "</div>";
   card.appendChild(p);
   const el = (f) => p.querySelector('[data-f="' + f + '"]');
+  const osmMap = mountOsmPinMap(el("osm"), el("lat"), el("lon"));
+  p._osmMap = osmMap;
 
   function setMaps() {
     const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
     const addr = el("address").value.trim();
-    if (isFinite(lat) && isFinite(lon)) {
-      el("osm").src = "https://www.openstreetmap.org/export/embed.html?bbox=" +
-        (lon - 0.004) + "%2C" + (lat - 0.0025) + "%2C" + (lon + 0.004) + "%2C" + (lat + 0.0025) +
-        "&layer=mapnik&marker=" + lat + "%2C" + lon;
-    }
+    if (isFinite(lat) && isFinite(lon)) osmMap.setPin(lat, lon, { zoom: 17 });
     if (addr) {
       el("gmap").src = "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&z=16&output=embed";
       el("glink").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr);
@@ -540,14 +602,14 @@ function editPanel(it, card) {
 
   async function geocode() {
     const addr = el("address").value.trim();
-    if (!addr) { el("geoinfo").textContent = "No address — keep or set lat/lon manually."; return; }
+    if (!addr) { el("geoinfo").textContent = "No address — keep or drag the pin / set lat/lon."; return; }
     el("geoinfo").textContent = "Geocoding…";
     try {
       const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=au&q=" +
         encodeURIComponent(addr));
       const hits = await res.json();
       if (!hits.length) {
-        el("geoinfo").textContent = "No geocoder match — keep current pin or set lat/lon manually.";
+        el("geoinfo").textContent = "No geocoder match — keep current pin or drag it.";
         setMaps(); return;
       }
       el("lat").value = (+hits[0].lat).toFixed(6);
