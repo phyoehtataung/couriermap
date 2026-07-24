@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CourierMap — Confirm</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #fff;
+    --text: #14181d;
+    --muted: #67707b;
+    --line: #e3e6ea;
+    --accent: #2563eb;
+    --danger: #dc2626;
+    --ok: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101418;
+      --card: #1a2027;
+      --text: #e8eaed;
+      --muted: #98a2ad;
+      --line: #2a323c;
+      --accent: #60a5fa;
+      --danger: #f87171;
+      --ok: #4ade80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px 24px;
+  }
+  .brand {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { margin: 0 0 16px; color: var(--muted); }
+  button {
+    width: 100%;
+    font: inherit;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    border-radius: 10px;
+    padding: 11px 14px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.55; cursor: default; }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--line);
+    margin-top: 8px;
+  }
+  input {
+    width: 100%;
+    font: inherit;
+    padding: 10px 12px;
+    margin: 0 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .status { min-height: 1.2em; margin: 12px 0 0; font-size: 14px; }
+  .status.err { color: var(--danger); }
+  .status.ok { color: var(--ok); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <p class="brand">CourierMap</p>
+    <h1 id="title">Confirm your email</h1>
+    <p id="blurb">Tap the button below to finish. This extra step stops email scanners from using your link early.</p>
+
+    <div id="ready">
+      <button type="button" id="confirmBtn">Confirm</button>
+    </div>
+
+    <div id="recovery" class="hidden">
+      <p>Choose a new password for your account.</p>
+      <input id="pw1" type="password" autocomplete="new-password" placeholder="New password" minlength="8">
+      <input id="pw2" type="password" autocomplete="new-password" placeholder="Confirm password" minlength="8">
+      <button type="button" id="savePwBtn">Save password</button>
+    </div>
+
+    <div id="done" class="hidden">
+      <p id="doneMsg">You’re all set. Open the CourierMap app and log in.</p>
+      <button type="button" class="secondary" id="openAppBtn">Open CourierMap</button>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+  <script>
+    // Publishable key — same class of secret as the mobile app bundle.
+    const SUPABASE_URL = "https://cscbtkjtbcgduiwfckgr.supabase.co";
+    const PUBLISHABLE_KEY = "sb_publishable_wNo2s6g61OxTDdWSBWzkzg_V88acVEi";
+    // Expo-router: app/(auth)/login.tsx → couriermap://login
+    const APP_LOGIN = "couriermap://login";
+
+    const COPY = {
+      email: {
+        title: "Confirm your email",
+        blurb: "Tap Confirm to verify this address and finish signing up.",
+        btn: "Confirm email",
+        done: "Email confirmed. Open the CourierMap app and log in.",
+      },
+      signup: {
+        title: "Confirm your email",
+        blurb: "Tap Confirm to verify this address and finish signing up.",
+        btn: "Confirm email",
+        done: "Email confirmed. Open the CourierMap app and log in.",
+      },
+      recovery: {
+        title: "Reset your password",
+        blurb: "Tap Continue, then choose a new password.",
+        btn: "Continue",
+        done: "Password updated. Open the CourierMap app and log in.",
+      },
+      email_change: {
+        title: "Confirm your new email",
+        blurb: "Tap Confirm to switch your CourierMap account to this address.",
+        btn: "Confirm new email",
+        done: "Email updated. Open the CourierMap app and log in with the new address.",
+      },
+      magiclink: {
+        title: "Sign in to CourierMap",
+        blurb: "Tap Continue to finish signing in.",
+        btn: "Continue",
+        done: "Signed in on the web. Open the CourierMap app and log in there too.",
+      },
+      invite: {
+        title: "Accept your invite",
+        blurb: "Tap Accept to activate your CourierMap account.",
+        btn: "Accept invite",
+        done: "Invite accepted. Open the CourierMap app and log in.",
+      },
+    };
+
+    const params = new URLSearchParams(location.search);
+    const token_hash = params.get("token_hash") || "";
+    const type = (params.get("type") || "email").toLowerCase();
+    const copy = COPY[type] || COPY.email;
+
+    const titleEl = document.getElementById("title");
+    const blurbEl = document.getElementById("blurb");
+    const statusEl = document.getElementById("status");
+    const confirmBtn = document.getElementById("confirmBtn");
+    const readyEl = document.getElementById("ready");
+    const recoveryEl = document.getElementById("recovery");
+    const doneEl = document.getElementById("done");
+    const doneMsg = document.getElementById("doneMsg");
+
+    titleEl.textContent = copy.title;
+    blurbEl.textContent = copy.blurb;
+    confirmBtn.textContent = copy.btn;
+    doneMsg.textContent = copy.done;
+
+    function setStatus(msg, kind) {
+      statusEl.textContent = msg || "";
+      statusEl.className = "status" + (kind ? " " + kind : "");
+    }
+
+    if (!token_hash) {
+      readyEl.classList.add("hidden");
+      setStatus("This link is missing its token. Request a new email from the app.", "err");
+    }
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
+    confirmBtn.addEventListener("click", async () => {
+      if (!token_hash) return;
+      confirmBtn.disabled = true;
+      setStatus("Confirming…");
+      const { data, error } = await supabase.auth.verifyOtp({ token_hash, type });
+      if (error) {
+        confirmBtn.disabled = false;
+        setStatus(error.message || "Could not confirm this link.", "err");
+        return;
+      }
+
+      readyEl.classList.add("hidden");
+      setStatus("");
+
+      if (type === "recovery") {
+        recoveryEl.classList.remove("hidden");
+        blurbEl.textContent = "Choose a new password for your account.";
+        return;
+      }
+
+      doneEl.classList.remove("hidden");
+      setStatus("Success.", "ok");
+      // Session stays in this browser tab only; the native app uses its own session.
+      if (data?.session) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      }
+      // Open the app Log in screen (also covers legacy couriermap://auth/callback redirects).
+      setTimeout(() => { location.href = APP_LOGIN; }, 600);
+    });
+
+    document.getElementById("savePwBtn").addEventListener("click", async () => {
+      const a = document.getElementById("pw1").value;
+      const b = document.getElementById("pw2").value;
+      if (a.length < 8) {
+        setStatus("Password must be at least 8 characters.", "err");
+        return;
+      }
+      if (a !== b) {
+        setStatus("Passwords do not match.", "err");
+        return;
+      }
+      setStatus("Saving…");
+      const { error } = await supabase.auth.updateUser({ password: a });
+      if (error) {
+        setStatus(error.message || "Could not update password.", "err");
+        return;
+      }
+      recoveryEl.classList.add("hidden");
+      doneEl.classList.remove("hidden");
+      setStatus("Success.", "ok");
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      setTimeout(() => { location.href = APP_LOGIN; }, 600);
+    });
+
+    document.getElementById("openAppBtn").addEventListener("click", () => {
+      location.href = APP_LOGIN;
+    });
+  </script>
+</body>
+</html>
