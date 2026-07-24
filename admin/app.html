@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CourierMap Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --text:#14181d; --muted:#67707b; --line:#e3e6ea;
+    --accent:#2563eb; --danger:#dc2626; --ok:#16a34a; --warn:#d97706; --chipbg:#eceff3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#101418; --card:#1a2027; --text:#e8eaed; --muted:#98a2ad; --line:#2a323c;
+      --accent:#60a5fa; --danger:#f87171; --ok:#4ade80; --warn:#fbbf24; --chipbg:#242c35;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:16px 16px 64px; }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  header .who { color:var(--muted); font-size:13px; }
+  .hidden { display:none !important; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px; margin-bottom:10px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .rowline { margin:4px 0; overflow-wrap:anywhere; }
+  .body-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0; }
+  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--text);
+           border-radius:8px; padding:6px 12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger  { color:var(--danger); border-color:var(--danger); }
+  button.ok      { color:var(--ok); border-color:var(--ok); }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .tabs, .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .tabs button.active, .chips button.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .badge { display:inline-block; min-width:18px; padding:0 5px; margin-left:6px; border-radius:9px;
+           background:var(--danger); color:#fff; font-size:11px; line-height:18px; text-align:center; }
+  .tabs button.active .badge { background:rgba(255,255,255,.3); }
+  .tag { display:inline-block; background:var(--chipbg); border-radius:6px; padding:1px 7px;
+         font-size:12px; margin-right:6px; }
+  .tag.warn { color:var(--warn); } .tag.danger { color:var(--danger); } .tag.ok { color:var(--ok); }
+  .shot { max-width:100%; max-height:420px; border-radius:8px; border:1px solid var(--line); margin-top:8px; display:block; }
+  a { color:var(--accent); }
+  .panel { border-top:1px solid var(--line); margin-top:10px; padding-top:10px; }
+  .panel .grid { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .panel .grid:first-child { margin-top:0; }
+  .panel input, .panel select { font:inherit; padding:7px 10px; border-radius:8px;
+    border:1px solid var(--line); background:var(--bg); color:var(--text); }
+  .panel input.wide { flex:1 1 220px; min-width:0; }
+  .panel input.coord { width:130px; }
+  .maps { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .maps > div { flex:1 1 280px; min-width:0; }
+  .maps .cap { font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .maps iframe, .maps .osm-map {
+    width:100%; height:280px; border:1px solid var(--line); border-radius:8px;
+    background:var(--chipbg); display:block; z-index:0;
+  }
+  .maps .osm-map .leaflet-container { height:100%; width:100%; border-radius:8px; font:inherit; }
+  #login { max-width:340px; margin:12vh auto 0; }
+  #login input { width:100%; font:inherit; padding:9px 11px; margin-bottom:10px; border-radius:8px;
+                 border:1px solid var(--line); background:var(--card); color:var(--text); }
+  #login button { width:100%; margin-bottom:8px; }
+  .err { color:var(--danger); font-size:13px; margin:6px 0; min-height:18px; }
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--danger);
+           color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; max-width:90vw; }
+  .center { text-align:center; color:var(--muted); padding:24px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="app">
+    <header>
+      <h1>CourierMap Admin</h1>
+      <span class="who" id="who"></span>
+      <button id="refreshBtn" title="Refresh">&#8635;</button>
+      <button id="signOut">Sign out</button>
+    </header>
+    <div class="tabs" id="tabs"></div>
+    <div class="chips" id="chips"></div>
+    <div id="list"></div>
+    <div class="center hidden" id="empty">Nothing here.</div>
+    <div class="center hidden" id="loading">Loading…</div>
+    <div class="actions" style="justify-content:center">
+      <button id="moreBtn" class="hidden">Load more</button>
+    </div>
+  </div>
+  <div id="toast" class="hidden"></div>
+</div>
+
+<script src="./client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+"use strict";
+// Dashboard UI — API is the admin-api Edge Function (see client.js).
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function mountOsmPinMap(container, latInput, lonInput) {
+  const map = L.map(container, { scrollWheelZoom: true });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+    maxZoom: 19,
+  }).addTo(map);
+
+  let marker = null;
+
+  function writeInputs(lat, lon) {
+    latInput.value = (+lat).toFixed(6);
+    lonInput.value = (+lon).toFixed(6);
+  }
+
+  function setPin(lat, lon, opts) {
+    if (!isFinite(lat) || !isFinite(lon)) return;
+    const zoom = (opts && opts.zoom) || Math.max(map.getZoom() || 0, 17);
+    if (marker) {
+      marker.setLatLng([lat, lon]);
+    } else {
+      marker = L.marker([lat, lon], { draggable: true, autoPan: true }).addTo(map);
+      marker.on("dragend", () => {
+        const ll = marker.getLatLng();
+        writeInputs(ll.lat, ll.lng);
+      });
+    }
+    map.setView([lat, lon], zoom);
+    requestAnimationFrame(() => map.invalidateSize());
+  }
+
+  map.on("click", (e) => {
+    writeInputs(e.latlng.lat, e.latlng.lng);
+    setPin(e.latlng.lat, e.latlng.lng);
+  });
+
+  map.setView([-33.8688, 151.2093], 12);
+  requestAnimationFrame(() => map.invalidateSize());
+
+  return {
+    setPin,
+    destroy() { map.remove(); },
+  };
+}
+
+function closeReviewPanel(card) {
+  const old = card.querySelector(".panel");
+  if (!old) return false;
+  if (old._osmMap) { old._osmMap.destroy(); old._osmMap = null; }
+  old.remove();
+  return true;
+}
+
+const PAGE = 30;
+const TABS = {
+  suggestions: { label:"Suggestions", badge:"suggestions_pending",
+                 statuses:["pending","approved","rejected","all"], def:"pending" },
+  claims:      { label:"Claims", badge:"claims_pending",
+                 statuses:["pending","approved","rejected","auto_approved","withdrawn","all"], def:"pending" },
+  reports:     { label:"Reports", badge:"reports_open",
+                 statuses:["open","resolved_hide","resolved_keep","all"], def:"open" },
+  bugs:        { label:"Bugs", badge:"bugs_open",
+                 statuses:["open","resolved","closed","all"], def:"open" },
+};
+const state = { tab:"suggestions", filter:{}, items:[], counts:{}, busy:false };
+for (const k in TABS) state.filter[k] = TABS[k].def;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+  (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const when = (ts) => ts ? new Date(ts).toLocaleString() : "";
+const person = (name, handle) =>
+  esc(name || "(no name)") + (handle ? ' <span class="muted">@' + esc(handle) + "</span>" : "");
+
+let toastTimer;
+function toast(msg, ok) {
+  const t = $("toast");
+  t.style.background = ok ? "var(--ok)" : "var(--danger)";
+  t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), ok ? 8000 : 5000);
+}
+
+async function api(action, payload) {
+  return CMAdmin.api(action, payload);
+}
+
+async function enter(email) {
+  $("who").textContent = email || "";
+  try {
+    const data = await api("counts");
+    state.counts = data.counts || {};
+  } catch (e) {
+    if (e.code === "42501" || /forbidden/i.test(e.message || "")) {
+      location.href = "./";
+      return;
+    }
+    toast(e.message || "Failed to load counts");
+  }
+  renderTabs();
+  await loadTab(true);
+}
+
+async function init() {
+  try {
+    const me = await api("me");
+    await enter(me.email);
+  } catch (_) {
+    location.href = "./";
+  }
+}
+
+$("signOut").addEventListener("click", async () => {
+  try { await api("logout"); } catch (_) { /* ignore */ }
+  CMAdmin.clear();
+  location.href = "./";
+});
+
+function renderTabs() {
+  $("tabs").innerHTML = Object.entries(TABS).map(([k, t]) => {
+    const n = state.counts[t.badge] | 0;
+    return '<button data-tab="' + k + '"' + (k === state.tab ? ' class="active"' : "") + ">" +
+      t.label + (n ? '<span class="badge">' + n + "</span>" : "") + "</button>";
+  }).join("");
+  $("chips").innerHTML = TABS[state.tab].statuses.map((s) =>
+    '<button data-chip="' + s + '"' + (s === state.filter[state.tab] ? ' class="active"' : "") + ">" +
+    s.replace("_", " ") + "</button>").join("");
+}
+$("tabs").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-tab]");
+  if (!b) return;
+  state.tab = b.dataset.tab;
+  renderTabs(); loadTab(true);
+});
+$("chips").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-chip]");
+  if (!b) return;
+  state.filter[state.tab] = b.dataset.chip;
+  renderTabs(); loadTab(true);
+});
+$("moreBtn").addEventListener("click", () => loadTab(false));
+$("refreshBtn").addEventListener("click", () => refresh());
+
+async function refresh() {
+  try {
+    const data = await api("counts");
+    state.counts = data.counts || {};
+  } catch (e) { toast(e.message); }
+  renderTabs();
+  await loadTab(true);
+}
+
+async function loadTab(reset) {
+  const f = state.filter[state.tab];
+  if (reset) { state.items = []; $("list").innerHTML = ""; }
+  $("loading").classList.remove("hidden");
+  $("empty").classList.add("hidden");
+  $("moreBtn").classList.add("hidden");
+  try {
+    const last = state.items[state.items.length - 1];
+    const data = await api("list", {
+      tab: state.tab,
+      status: f === "all" ? null : f,
+      limit: PAGE,
+      before: reset ? null : (last ? last.created_at : null),
+    });
+    const items = (data && data.items) || [];
+    state.items = state.items.concat(items);
+    renderList();
+    $("moreBtn").classList.toggle("hidden", items.length < PAGE);
+    $("empty").classList.toggle("hidden", state.items.length > 0);
+  } catch (e) {
+    toast(e.message || "Failed to load");
+  } finally {
+    $("loading").classList.add("hidden");
+  }
+}
+
+function statusTag(s) {
+  const cls = /pending|open/.test(s) ? "warn" : /approved|resolved|resolved_keep/.test(s) ? "ok"
+            : /rejected|closed|resolved_hide/.test(s) ? "danger" : "";
+  return '<span class="tag ' + cls + '">' + esc(s) + "</span>";
+}
+const shotBtn = (url, label) => url
+  ? '<button data-act="shot" data-url="' + esc(url) + '">' + label + "</button>" : "";
+
+const renderers = {
+  suggestions(it) {
+    const flags =
+      (it.new_place ? '<span class="tag ok">new place</span>' : "") +
+      (it.permanently_closed ? '<span class="tag danger">permanently closed</span>' : "") +
+      (it.moved_to_new_address ? '<span class="tag warn">moved</span>' : "") +
+      (it.permanently_closed && !it.place_id && it.status === "approved"
+        ? '<span class="tag">shop deleted</span>' : "");
+    const fields = ["name", "address", "opening_hours"]
+      .filter((k) => it[k])
+      .map((k) => '<div class="rowline"><b>' + k.replace("_", " ") + ":</b> " + esc(it[k]) +
+        (k === "address"
+          ? ' <a href="https://www.google.com/maps/search/?api=1&query=' +
+            encodeURIComponent(it.address) + '" target="_blank" rel="noopener">map &#8599;</a>'
+          : "") +
+        "</div>")
+      .join("");
+    const canDeleteClosed = it.permanently_closed && it.place_id && !it.new_place
+      && (it.status === "pending" || it.status === "approved");
+    let actions = "";
+    if (it.status === "pending") {
+      if (it.new_place) {
+        actions += '<button class="ok" data-act="newplace" data-id="' + it.id +
+          '">Review location &amp; create&#8230;</button>';
+      } else if (canDeleteClosed) {
+        actions += '<button class="danger" data-act="delclosed" data-id="' + it.id +
+          '">Approve &amp; delete shop</button>';
+      } else {
+        actions += '<button class="ok" data-act="editplace" data-id="' + it.id +
+          '">Review &amp; apply&#8230;</button>';
+      }
+      actions += '<button class="danger" data-act="sugg" data-id="' + it.id +
+        '" data-status="rejected">Reject</button>';
+    } else {
+      actions += '<button data-act="sugg" data-id="' + it.id +
+        '" data-status="pending">Reopen</button>';
+      if (canDeleteClosed) {
+        actions += '<button class="danger" data-act="delclosed" data-id="' + it.id +
+          '">Delete shop</button>';
+      }
+    }
+    return '<div class="card">' +
+      statusTag(it.status) + flags +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="rowline muted">' +
+      (it.place_id
+        ? "Edit for <b>" + esc(it.place_name || it.place_id) + "</b>" +
+          (it.place_address ? " — " + esc(it.place_address) : "")
+        : (it.permanently_closed && it.status === "approved"
+            ? "Shop deleted" + (it.name ? " — <b>" + esc(it.name) + "</b>" : "")
+            : "New place submission")) +
+      "</div>" + fields +
+      '<div class="rowline muted">By ' + person(it.user_name, it.handle) + "</div>" +
+      '<div class="actions">' + actions + "</div></div>";
+  },
+  claims(it) {
+    return '<div class="card">' +
+      statusTag(it.status) +
+      (it.defends_claim_id ? '<span class="tag">defense</span>' : "") +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="rowline"><b>Driver name:</b> ' + esc(it.driver_name) + "</div>" +
+      '<div class="rowline">Claimant: ' + person(it.claimant_name, it.claimant_handle) +
+      ' <span class="tag">' + esc(it.claimant_status || "?") + "</span></div>" +
+      (it.conflict_name
+        ? '<div class="rowline">Conflicts with: ' + person(it.conflict_name, it.conflict_handle) + "</div>" : "") +
+      (it.admin_notes ? '<div class="rowline muted">Notes: ' + esc(it.admin_notes) + "</div>" : "") +
+      '<div class="actions">' +
+      shotBtn(it.screenshot_url, "Claim screenshot") +
+      shotBtn(it.conflict_screenshot_url, "Incumbent's verified screenshot") +
+      shotBtn(it.defense_screenshot_url, "Defense screenshot") +
+      (it.status === "pending"
+        ? '<button class="ok" data-act="claim" data-id="' + it.id + '" data-approve="1">Approve</button>' +
+          '<button class="danger" data-act="claim" data-id="' + it.id + '" data-approve="">Reject</button>'
+        : "") +
+      "</div></div>";
+  },
+  reports(it) {
+    const gone = it.target_deleted;
+    return '<div class="card">' +
+      statusTag(it.status) +
+      '<span class="tag">' + esc(it.target_kind).replace("_", " ") + "</span>" +
+      (it.open_count > 1 ? '<span class="tag warn">' + it.open_count + " open reports</span>" : "") +
+      (it.target_hidden ? '<span class="tag danger">hidden</span>' : "") +
+      (gone ? '<span class="tag">deleted</span>' : "") +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="rowline"><b>' + esc(it.reason) + "</b>" +
+      (it.detail ? ' — <span class="muted">' + esc(it.detail) + "</span>" : "") + "</div>" +
+      (gone ? '<div class="body-text muted">[content deleted]</div>'
+            : '<div class="body-text">' + esc(it.target_text || "(no text)") + "</div>") +
+      '<div class="rowline muted">By ' + person(it.author_name, it.author_handle) +
+      (it.place_name ? " at " + esc(it.place_name) : "") +
+      " · reported by " + person(it.reporter_name, it.reporter_handle) + "</div>" +
+      '<div class="actions">' +
+      (it.status === "open" && !gone
+        ? '<button class="danger" data-act="report" data-kind="' + esc(it.target_kind) +
+          '" data-id="' + it.target_id + '" data-hide="1">Hide content</button>' +
+          '<button class="ok" data-act="report" data-kind="' + esc(it.target_kind) +
+          '" data-id="' + it.target_id + '" data-hide="">Keep (unhide)</button>'
+        : "") +
+      "</div></div>";
+  },
+  bugs(it) {
+    return '<div class="card">' +
+      statusTag(it.status) +
+      '<span class="muted" style="float:right">' + when(it.created_at) + "</span>" +
+      '<div class="body-text">' + esc(it.description) + "</div>" +
+      '<div class="rowline muted">By ' + person(it.user_name, it.handle) + "</div>" +
+      '<div class="actions">' +
+      (it.status === "open"
+        ? '<button class="ok" data-act="bug" data-id="' + it.id + '" data-status="resolved">Resolve</button>' +
+          '<button data-act="bug" data-id="' + it.id + '" data-status="closed">Close</button>'
+        : '<button data-act="bug" data-id="' + it.id + '" data-status="open">Reopen</button>') +
+      "</div></div>";
+  },
+};
+
+function renderList() {
+  $("list").innerHTML = state.items.map(renderers[state.tab]).join("");
+}
+
+const CATEGORIES = ["restaurant", "cafe", "fast_food", "bar", "pub", "takeaway",
+                    "food_court", "supermarket", "convenience"];
+
+function reviewPanel(it, card) {
+  if (closeReviewPanel(card)) return;
+  const p = document.createElement("div");
+  p.className = "panel";
+  p.innerHTML =
+    '<div class="grid">' +
+      '<input class="wide" data-f="name" placeholder="Place name" value="' + esc(it.name || "") + '">' +
+      '<select data-f="category"><option value="">category…</option>' +
+        CATEGORIES.map((c) => '<option value="' + c + '">' + c.replace("_", " ") + "</option>").join("") +
+      "</select></div>" +
+    '<div class="grid">' +
+      '<input class="wide" data-f="address" placeholder="Address" value="' + esc(it.address || "") + '">' +
+      '<button data-f="geocode">Geocode</button></div>' +
+    '<div class="grid">' +
+      '<input class="coord" data-f="lat" placeholder="lat" inputmode="decimal">' +
+      '<input class="coord" data-f="lon" placeholder="lon" inputmode="decimal">' +
+      '<button data-f="pin">Update pin</button>' +
+      '<span class="muted" data-f="geoinfo" style="flex:1 1 200px"></span></div>' +
+    '<div class="maps">' +
+      '<div><div class="cap">OSM pin (saved) — drag or click to correct geocode drift</div>' +
+        '<div class="osm-map" data-f="osm"></div></div>' +
+      '<div><div class="cap">Google Maps address search — compare</div>' +
+        '<iframe data-f="gmap" loading="lazy"></iframe></div>' +
+    "</div>" +
+    '<div class="actions">' +
+      '<button class="ok" data-f="create">Create place &amp; approve</button>' +
+      '<a data-f="glink" href="#" target="_blank" rel="noopener">Open in Google Maps &#8599;</a>' +
+    "</div>";
+  card.appendChild(p);
+  const el = (f) => p.querySelector('[data-f="' + f + '"]');
+  const osmMap = mountOsmPinMap(el("osm"), el("lat"), el("lon"));
+  p._osmMap = osmMap;
+
+  function setMaps() {
+    const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
+    const addr = el("address").value.trim();
+    if (isFinite(lat) && isFinite(lon)) osmMap.setPin(lat, lon, { zoom: 17 });
+    if (addr) {
+      el("gmap").src = "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&z=16&output=embed";
+      el("glink").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr);
+    }
+  }
+
+  async function geocode() {
+    const addr = el("address").value.trim();
+    if (!addr) { el("geoinfo").textContent = "No address — drag the pin or set lat/lon."; return; }
+    el("geoinfo").textContent = "Geocoding…";
+    try {
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=au&q=" +
+        encodeURIComponent(addr));
+      const hits = await res.json();
+      if (!hits.length) {
+        el("geoinfo").textContent = "No geocoder match — drag the pin or type lat/lon.";
+        setMaps(); return;
+      }
+      el("lat").value = (+hits[0].lat).toFixed(6);
+      el("lon").value = (+hits[0].lon).toFixed(6);
+      el("geoinfo").textContent = "-> " + hits[0].display_name;
+      setMaps();
+    } catch (e) {
+      el("geoinfo").textContent = "Geocoding failed: " + (e.message || e);
+    }
+  }
+
+  el("geocode").addEventListener("click", geocode);
+  el("pin").addEventListener("click", setMaps);
+  el("create").addEventListener("click", () => {
+    const name = el("name").value.trim(), cat = el("category").value;
+    const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
+    if (!name) { toast("Name is required"); return; }
+    if (!cat) { toast("Pick a category"); return; }
+    if (!isFinite(lat) || !isFinite(lon)) { toast("Set lat/lon (geocode, drag pin, or type them)"); return; }
+    act("approve_new_place", {
+      suggestion_id: it.id, name, category: cat,
+      address: el("address").value.trim() || null,
+      lon, lat,
+      opening_hours: it.opening_hours || null,
+    }, 'Create "' + name + '" (' + cat + ") at " + lat + ", " + lon + " and approve? (notifies the suggester)",
+       "Place created — searchable now; the map pin appears after the next tile republish.");
+  });
+
+  geocode();
+}
+
+function editPanel(it, card) {
+  if (closeReviewPanel(card)) return;
+  const name0 = it.name || it.place_name || "";
+  const addr0 = it.address || it.place_address || "";
+  const hours0 = it.opening_hours != null ? it.opening_hours
+               : (it.place_opening_hours || "");
+  const p = document.createElement("div");
+  p.className = "panel";
+  p.innerHTML =
+    '<div class="muted" style="margin-bottom:6px">Applies to <b>' +
+      esc(it.place_name || it.place_id) + "</b> — search/detail update immediately; " +
+      "name/pin changes land on the map after the next shops republish.</div>" +
+    '<div class="grid">' +
+      '<input class="wide" data-f="name" placeholder="Place name" value="' + esc(name0) + '">' +
+    "</div>" +
+    '<div class="grid">' +
+      '<input class="wide" data-f="address" placeholder="Address" value="' + esc(addr0) + '">' +
+      '<button data-f="geocode">Geocode</button></div>' +
+    '<div class="grid">' +
+      '<input class="wide" data-f="hours" placeholder="Opening hours (OSM)" value="' + esc(hours0) + '">' +
+    "</div>" +
+    '<div class="grid">' +
+      '<input class="coord" data-f="lat" placeholder="lat" inputmode="decimal"' +
+        (it.place_lat != null ? ' value="' + (+it.place_lat).toFixed(6) + '"' : "") + ">" +
+      '<input class="coord" data-f="lon" placeholder="lon" inputmode="decimal"' +
+        (it.place_lon != null ? ' value="' + (+it.place_lon).toFixed(6) + '"' : "") + ">" +
+      '<button data-f="pin">Update pin</button>' +
+      '<span class="muted" data-f="geoinfo" style="flex:1 1 200px">' +
+        (it.moved_to_new_address ? "Moved — geocode the new address (or drag the pin)." : "") +
+      "</span></div>" +
+    '<div class="maps">' +
+      '<div><div class="cap">OSM pin — drag or click to nudge; saved when lat/lon are set</div>' +
+        '<div class="osm-map" data-f="osm"></div></div>' +
+      '<div><div class="cap">Google Maps address search — compare</div>' +
+        '<iframe data-f="gmap" loading="lazy"></iframe></div>' +
+    "</div>" +
+    '<div class="actions">' +
+      '<button class="ok" data-f="apply">Apply &amp; approve</button>' +
+      '<a data-f="glink" href="#" target="_blank" rel="noopener">Open in Google Maps &#8599;</a>' +
+    "</div>";
+  card.appendChild(p);
+  const el = (f) => p.querySelector('[data-f="' + f + '"]');
+  const osmMap = mountOsmPinMap(el("osm"), el("lat"), el("lon"));
+  p._osmMap = osmMap;
+
+  function setMaps() {
+    const lat = parseFloat(el("lat").value), lon = parseFloat(el("lon").value);
+    const addr = el("address").value.trim();
+    if (isFinite(lat) && isFinite(lon)) osmMap.setPin(lat, lon, { zoom: 17 });
+    if (addr) {
+      el("gmap").src = "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&z=16&output=embed";
+      el("glink").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr);
+    }
+  }
+
+  async function geocode() {
+    const addr = el("address").value.trim();
+    if (!addr) { el("geoinfo").textContent = "No address — keep or drag the pin / set lat/lon."; return; }
+    el("geoinfo").textContent = "Geocoding…";
+    try {
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=au&q=" +
+        encodeURIComponent(addr));
+      const hits = await res.json();
+      if (!hits.length) {
+        el("geoinfo").textContent = "No geocoder match — keep current pin or drag it.";
+        setMaps(); return;
+      }
+      el("lat").value = (+hits[0].lat).toFixed(6);
+      el("lon").value = (+hits[0].lon).toFixed(6);
+      el("geoinfo").textContent = "-> " + hits[0].display_name;
+      setMaps();
+    } catch (e) {
+      el("geoinfo").textContent = "Geocoding failed: " + (e.message || e);
+    }
+  }
+
+  el("geocode").addEventListener("click", geocode);
+  el("pin").addEventListener("click", setMaps);
+  el("apply").addEventListener("click", () => {
+    const name = el("name").value.trim();
+    const latRaw = el("lat").value.trim(), lonRaw = el("lon").value.trim();
+    const lat = parseFloat(latRaw), lon = parseFloat(lonRaw);
+    const hasCoords = latRaw !== "" || lonRaw !== "";
+    if (!name) { toast("Name is required"); return; }
+    if (hasCoords && (!isFinite(lat) || !isFinite(lon))) {
+      toast("Set both lat and lon, or clear both to keep the current pin"); return;
+    }
+    const args = {
+      suggestion_id: it.id,
+      name,
+      address: el("address").value.trim() || null,
+      opening_hours: el("hours").value.trim() || null,
+      lon: hasCoords ? lon : null,
+      lat: hasCoords ? lat : null,
+    };
+    const pinNote = hasCoords ? (" @ " + lat + ", " + lon) : " (pin unchanged)";
+    act("apply_edit_suggestion", args,
+        'Apply edit to "' + name + '"' + pinNote + " and approve? (notifies the suggester)",
+        "Edit applied — searchable now; name/pin on the map update after the next shops republish.");
+  });
+
+  setMaps();
+  if (it.moved_to_new_address || (it.address && it.address !== it.place_address)) geocode();
+}
+
+async function act(op, args, confirmMsg, successMsg) {
+  if (state.busy) return;
+  if (confirmMsg && !window.confirm(confirmMsg)) return;
+  state.busy = true;
+  try {
+    await api("mutate", { op, args });
+    await refresh();
+    if (successMsg) toast(successMsg, true);
+  } catch (e) {
+    toast(e.message || "Action failed");
+  } finally {
+    state.busy = false;
+  }
+}
+
+$("list").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-act]");
+  if (!b) return;
+  const d = b.dataset;
+  if (d.act === "sugg") {
+    act("set_suggestion_status", { id: d.id, status: d.status },
+        "Set suggestion to " + d.status + "? (notifies the suggester)");
+  } else if (d.act === "delclosed") {
+    const item = state.items.find((x) => x.id === d.id);
+    const label = (item && (item.place_name || item.name)) || "this shop";
+    act("delete_closed_place", { suggestion_id: d.id },
+        'Permanently delete "' + label + '" from the database? ' +
+        "Approves the suggestion (if pending), removes ratings/tips for the shop, " +
+        "and notifies the suggester. The map pin clears after the next tile republish.",
+        "Shop deleted — searchable/tappable now gone; map pin clears on next shops republish.");
+  } else if (d.act === "newplace") {
+    const item = state.items.find((x) => x.id === d.id);
+    if (item) reviewPanel(item, b.closest(".card"));
+  } else if (d.act === "editplace") {
+    const item = state.items.find((x) => x.id === d.id);
+    if (item) editPanel(item, b.closest(".card"));
+  } else if (d.act === "claim") {
+    const verb = d.approve ? "APPROVE" : "REJECT";
+    const notes = window.prompt(verb + " this claim — optional admin note (Cancel aborts):", "");
+    if (notes === null) return;
+    act("decide_claim", { id: d.id, approve: !!d.approve, notes: notes || null });
+  } else if (d.act === "report") {
+    act("resolve_reports", { target_kind: d.kind, target_id: d.id, hide: !!d.hide },
+        d.hide ? "Hide this content and resolve all its open reports?"
+               : "Keep (un-hide) this content and resolve all its open reports?");
+  } else if (d.act === "bug") {
+    act("set_bug_status", { id: d.id, status: d.status });
+  } else if (d.act === "shot") {
+    const m = /driver-screenshots\/(.+)$/.exec(d.url);
+    if (!m) { toast("Unrecognized screenshot URL"); return; }
+    b.disabled = true;
+    try {
+      const path = decodeURIComponent(m[1]);
+      const data = await api("sign_shot", { path: path });
+      const img = document.createElement("img");
+      img.className = "shot";
+      img.alt = "Screenshot";
+      img.src = data.signedUrl;
+      img.onerror = () => { toast("Failed to load screenshot"); b.disabled = false; };
+      img.onload = () => { b.remove(); };
+      b.closest(".card").appendChild(img);
+    } catch (e) {
+      toast(e.message || "Failed to load screenshot");
+      b.disabled = false;
+    }
+  }
+});
+
+init();
+</script>
+</body>
+</html>

@@ -39,51 +39,42 @@
   </form>
   <button id="googleBtn" class="secondary" type="button">Continue with Google</button>
 </div>
+<script src="./client.js"></script>
 <script>
 "use strict";
 (function () {
-  const APP = "/api/admin/app";
   const err = document.getElementById("loginErr");
   const q = new URLSearchParams(location.search).get("err");
   if (q === "forbidden") err.textContent = "Not an admin";
   else if (q) err.textContent = q;
 
-  // Already signed in (cookie) → dashboard lives on the Worker, not Pages.
-  fetch("/api/admin", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "me" }),
-  }).then((r) => { if (r.ok) location.replace(APP); }).catch(() => {});
+  const sess = CMAdmin.session();
+  if (sess && sess.access_token) {
+    CMAdmin.api("me").then(function () {
+      location.replace("./app.html");
+    }).catch(function () { CMAdmin.clear(); });
+  }
 
-  document.getElementById("googleBtn").addEventListener("click", () => {
-    location.href = "/api/admin/oauth/google";
+  document.getElementById("googleBtn").addEventListener("click", function () {
+    CMAdmin.startGoogle().catch(function (e) {
+      err.textContent = e.message || "Google sign-in failed";
+    });
   });
 
-  document.getElementById("loginForm").addEventListener("submit", async (ev) => {
+  document.getElementById("loginForm").addEventListener("submit", async function (ev) {
     ev.preventDefault();
     err.textContent = "";
     try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "login",
-          email: document.getElementById("email").value.trim(),
-          password: document.getElementById("password").value,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        err.textContent = data.error === "invalid_credentials"
-          ? "Invalid email or password"
-          : (data.error === "forbidden" ? "Not an admin" : (data.error || "Sign-in failed"));
-        return;
-      }
-      location.replace(APP);
+      const data = await CMAdmin.api("login", {
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+      }, { anonymous: true });
+      CMAdmin.setSession(data);
+      location.replace("./app.html");
     } catch (e) {
-      err.textContent = e.message || "Sign-in failed";
+      err.textContent = e.message === "invalid_credentials"
+        ? "Invalid email or password"
+        : (e.code === "42501" || e.message === "forbidden" ? "Not an admin" : (e.message || "Sign-in failed"));
     }
   });
 })();

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>Signing in…</title>
+</head>
+<body>
+<p style="font:15px system-ui;padding:24px">Signing in…</p>
+<script src="./client.js"></script>
+<script>
+"use strict";
+(async function () {
+  const params = new URLSearchParams(location.search);
+  const err = params.get("error_description") || params.get("error");
+  if (err) {
+    location.replace("./?err=" + encodeURIComponent(err));
+    return;
+  }
+  const code = params.get("code") || "";
+  const verifier = sessionStorage.getItem("cm_admin_pkce") || "";
+  sessionStorage.removeItem("cm_admin_pkce");
+  if (!code || !verifier) {
+    location.replace("./?err=" + encodeURIComponent("oauth_missing_code"));
+    return;
+  }
+  try {
+    const data = await CMAdmin.api("oauth_exchange", {
+      code: code,
+      code_verifier: verifier,
+    }, { anonymous: true });
+    CMAdmin.setSession(data);
+    location.replace("./app.html");
+  } catch (e) {
+    const msg = e.code === "42501" || e.message === "forbidden" ? "forbidden" : (e.message || "oauth_failed");
+    location.replace("./?err=" + encodeURIComponent(msg));
+  }
+})();
+</script>
+</body>
+</html>
