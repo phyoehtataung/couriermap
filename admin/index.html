@@ -85,7 +85,6 @@
       <div id="loginErr" class="err"></div>
       <button class="primary" type="submit">Sign in</button>
     </form>
-    <button id="googleBtn" type="button">Continue with Google</button>
   </div>
 
   <div id="notAdmin" class="hidden">
@@ -114,17 +113,14 @@
   <div id="toast" class="hidden"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 "use strict";
-// Publishable key — public by design (same values ship inside the app bundle).
-const SUPABASE_URL = "https://cscbtkjtbcgduiwfckgr.supabase.co";
-const SUPABASE_KEY = "sb_publishable_wNo2s6g61OxTDdWSBWzkzg_V88acVEi";
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Same-origin BFF only — no Supabase URL/key in this page. Session lives in
+// HttpOnly cookies set by the Cloudflare Worker at /api/admin.
+const API = "/api/admin";
 
-// CDN Leaflet looks for icons relative to the page URL — pin absolute paths.
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -167,7 +163,7 @@ function mountOsmPinMap(container, latInput, lonInput) {
     setPin(e.latlng.lat, e.latlng.lng);
   });
 
-  map.setView([-33.8688, 151.2093], 12); // Sydney until coords land
+  map.setView([-33.8688, 151.2093], 12);
   requestAnimationFrame(() => map.invalidateSize());
 
   return {
@@ -186,13 +182,13 @@ function closeReviewPanel(card) {
 
 const PAGE = 30;
 const TABS = {
-  suggestions: { label:"Suggestions", badge:"suggestions_pending", rpc:"admin_list_suggestions",
+  suggestions: { label:"Suggestions", badge:"suggestions_pending",
                  statuses:["pending","approved","rejected","all"], def:"pending" },
-  claims:      { label:"Claims", badge:"claims_pending", rpc:"admin_list_claims",
+  claims:      { label:"Claims", badge:"claims_pending",
                  statuses:["pending","approved","rejected","auto_approved","withdrawn","all"], def:"pending" },
-  reports:     { label:"Reports", badge:"reports_open", rpc:"admin_list_reports",
+  reports:     { label:"Reports", badge:"reports_open",
                  statuses:["open","resolved_hide","resolved_keep","all"], def:"open" },
-  bugs:        { label:"Bugs", badge:"bugs_open", rpc:"admin_list_bug_reports",
+  bugs:        { label:"Bugs", badge:"bugs_open",
                  statuses:["open","resolved","closed","all"], def:"open" },
 };
 const state = { tab:"suggestions", filter:{}, items:[], counts:{}, busy:false };
@@ -214,28 +210,39 @@ function toast(msg, ok) {
   toastTimer = setTimeout(() => t.classList.add("hidden"), ok ? 8000 : 5000);
 }
 
-async function rpc(fn, args) {
-  const { data, error } = await db.rpc(fn, args || {});
-  if (error) throw error;
+async function api(action, payload) {
+  const res = await fetch(API, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ action }, payload || {})),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (_) { /* empty */ }
+  if (!res.ok) {
+    const err = new Error(data.error || data.detail || ("HTTP " + res.status));
+    err.code = data.code || String(res.status);
+    throw err;
+  }
   return data;
 }
 
-// ── Auth ────────────────────────────────────────────────────────────────────
 function show(view) {
   for (const id of ["login", "notAdmin", "app"]) $(id).classList.toggle("hidden", id !== view);
 }
 
 let entering = false;
-async function enter(session) {
+async function enter(email) {
   if (entering) return;
   entering = true;
   try {
-    $("who").textContent = session.user.email || "";
+    $("who").textContent = email || "";
     try {
-      state.counts = await rpc("admin_get_counts");
+      const data = await api("counts");
+      state.counts = data.counts || {};
     } catch (e) {
-      if (e.code === "42501" || /admin only/i.test(e.message || "")) { show("notAdmin"); return; }
-      toast(e.message || "Failed to load counts"); // transient (offline etc.) — stay in
+      if (e.code === "42501" || /forbidden/i.test(e.message || "")) { show("notAdmin"); return; }
+      toast(e.message || "Failed to load counts");
     }
     show("app");
     renderTabs();
@@ -246,32 +253,39 @@ async function enter(session) {
 }
 
 async function init() {
-  const { data: { session } } = await db.auth.getSession();
-  if (session) enter(session); else show("login");
-  db.auth.onAuthStateChange((event, s) => {
-    if (event === "SIGNED_OUT") show("login");
-    else if (event === "SIGNED_IN" && s && $("app").classList.contains("hidden")) enter(s);
-  });
+  try {
+    const me = await api("me");
+    await enter(me.email);
+  } catch (_) {
+    show("login");
+  }
 }
 
 $("loginForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   $("loginErr").textContent = "";
-  const { data, error } = await db.auth.signInWithPassword({
-    email: $("email").value.trim(), password: $("password").value,
-  });
-  if (error) { $("loginErr").textContent = error.message; return; }
-  enter(data.session);
+  try {
+    const data = await api("login", {
+      email: $("email").value.trim(),
+      password: $("password").value,
+    });
+    await enter(data.email);
+  } catch (e) {
+    if (e.code === "42501" || /forbidden/i.test(e.message || "")) {
+      show("notAdmin");
+      return;
+    }
+    $("loginErr").textContent = e.message === "invalid_credentials"
+      ? "Invalid email or password" : (e.message || "Sign-in failed");
+  }
 });
-$("googleBtn").addEventListener("click", () => db.auth.signInWithOAuth({
-  provider: "google",
-  options: { redirectTo: location.origin + location.pathname },
-}));
-const signOut = () => db.auth.signOut();
+const signOut = async () => {
+  try { await api("logout"); } catch (_) { /* ignore */ }
+  show("login");
+};
 $("signOut").addEventListener("click", signOut);
 $("signOut2").addEventListener("click", signOut);
 
-// ── Tabs / filters / list ───────────────────────────────────────────────────
 function renderTabs() {
   $("tabs").innerHTML = Object.entries(TABS).map(([k, t]) => {
     const n = state.counts[t.badge] | 0;
@@ -298,23 +312,27 @@ $("moreBtn").addEventListener("click", () => loadTab(false));
 $("refreshBtn").addEventListener("click", () => refresh());
 
 async function refresh() {
-  try { state.counts = await rpc("admin_get_counts"); } catch (e) { toast(e.message); }
+  try {
+    const data = await api("counts");
+    state.counts = data.counts || {};
+  } catch (e) { toast(e.message); }
   renderTabs();
   await loadTab(true);
 }
 
 async function loadTab(reset) {
-  const t = TABS[state.tab], f = state.filter[state.tab];
+  const f = state.filter[state.tab];
   if (reset) { state.items = []; $("list").innerHTML = ""; }
   $("loading").classList.remove("hidden");
   $("empty").classList.add("hidden");
   $("moreBtn").classList.add("hidden");
   try {
     const last = state.items[state.items.length - 1];
-    const data = await rpc(t.rpc, {
-      p_status: f === "all" ? null : f,
-      p_limit: PAGE,
-      p_before: reset ? null : (last ? last.created_at : null),
+    const data = await api("list", {
+      tab: state.tab,
+      status: f === "all" ? null : f,
+      limit: PAGE,
+      before: reset ? null : (last ? last.created_at : null),
     });
     const items = (data && data.items) || [];
     state.items = state.items.concat(items);
@@ -456,12 +474,11 @@ function renderList() {
   $("list").innerHTML = state.items.map(renderers[state.tab]).join("");
 }
 
-// ── New-place review panel (geocode + side-by-side map compare) ─────────────
 const CATEGORIES = ["restaurant", "cafe", "fast_food", "bar", "pub", "takeaway",
                     "food_court", "supermarket", "convenience"];
 
 function reviewPanel(it, card) {
-  if (closeReviewPanel(card)) return; // toggle closed
+  if (closeReviewPanel(card)) return;
   const p = document.createElement("div");
   p.className = "panel";
   p.innerHTML =
@@ -517,7 +534,7 @@ function reviewPanel(it, card) {
       }
       el("lat").value = (+hits[0].lat).toFixed(6);
       el("lon").value = (+hits[0].lon).toFixed(6);
-      el("geoinfo").textContent = "→ " + hits[0].display_name;
+      el("geoinfo").textContent = "-> " + hits[0].display_name;
       setMaps();
     } catch (e) {
       el("geoinfo").textContent = "Geocoding failed: " + (e.message || e);
@@ -532,19 +549,18 @@ function reviewPanel(it, card) {
     if (!name) { toast("Name is required"); return; }
     if (!cat) { toast("Pick a category"); return; }
     if (!isFinite(lat) || !isFinite(lon)) { toast("Set lat/lon (geocode, drag pin, or type them)"); return; }
-    act("admin_approve_new_place", {
-      p_suggestion_id: it.id, p_name: name, p_category: cat,
-      p_address: el("address").value.trim() || null,
-      p_lon: lon, p_lat: lat,
-      p_opening_hours: it.opening_hours || null,
+    act("approve_new_place", {
+      suggestion_id: it.id, name, category: cat,
+      address: el("address").value.trim() || null,
+      lon, lat,
+      opening_hours: it.opening_hours || null,
     }, 'Create "' + name + '" (' + cat + ") at " + lat + ", " + lon + " and approve? (notifies the suggester)",
        "Place created — searchable now; the map pin appears after the next tile republish.");
   });
 
-  geocode(); // auto-run on open
+  geocode();
 }
 
-// ── Edit-suggestion review panel (apply name/address/hours + optional pin) ─
 function editPanel(it, card) {
   if (closeReviewPanel(card)) return;
   const name0 = it.name || it.place_name || "";
@@ -614,7 +630,7 @@ function editPanel(it, card) {
       }
       el("lat").value = (+hits[0].lat).toFixed(6);
       el("lon").value = (+hits[0].lon).toFixed(6);
-      el("geoinfo").textContent = "→ " + hits[0].display_name;
+      el("geoinfo").textContent = "-> " + hits[0].display_name;
       setMaps();
     } catch (e) {
       el("geoinfo").textContent = "Geocoding failed: " + (e.message || e);
@@ -633,31 +649,29 @@ function editPanel(it, card) {
       toast("Set both lat and lon, or clear both to keep the current pin"); return;
     }
     const args = {
-      p_suggestion_id: it.id,
-      p_name: name,
-      p_address: el("address").value.trim() || null,
-      p_opening_hours: el("hours").value.trim() || null,
-      p_lon: hasCoords ? lon : null,
-      p_lat: hasCoords ? lat : null,
+      suggestion_id: it.id,
+      name,
+      address: el("address").value.trim() || null,
+      opening_hours: el("hours").value.trim() || null,
+      lon: hasCoords ? lon : null,
+      lat: hasCoords ? lat : null,
     };
     const pinNote = hasCoords ? (" @ " + lat + ", " + lon) : " (pin unchanged)";
-    act("admin_apply_edit_suggestion", args,
+    act("apply_edit_suggestion", args,
         'Apply edit to "' + name + '"' + pinNote + " and approve? (notifies the suggester)",
         "Edit applied — searchable now; name/pin on the map update after the next shops republish.");
   });
 
   setMaps();
-  // Moved / new-address suggestions: refresh the pin from the suggested address.
   if (it.moved_to_new_address || (it.address && it.address !== it.place_address)) geocode();
 }
 
-// ── Actions ─────────────────────────────────────────────────────────────────
-async function act(fn, args, confirmMsg, successMsg) {
+async function act(op, args, confirmMsg, successMsg) {
   if (state.busy) return;
   if (confirmMsg && !window.confirm(confirmMsg)) return;
   state.busy = true;
   try {
-    await rpc(fn, args);
+    await api("mutate", { op, args });
     await refresh();
     if (successMsg) toast(successMsg, true);
   } catch (e) {
@@ -672,12 +686,12 @@ $("list").addEventListener("click", async (ev) => {
   if (!b) return;
   const d = b.dataset;
   if (d.act === "sugg") {
-    act("admin_set_suggestion_status", { p_id: d.id, p_status: d.status },
+    act("set_suggestion_status", { id: d.id, status: d.status },
         "Set suggestion to " + d.status + "? (notifies the suggester)");
   } else if (d.act === "delclosed") {
     const item = state.items.find((x) => x.id === d.id);
     const label = (item && (item.place_name || item.name)) || "this shop";
-    act("admin_delete_closed_place", { p_suggestion_id: d.id },
+    act("delete_closed_place", { suggestion_id: d.id },
         'Permanently delete "' + label + '" from the database? ' +
         "Approves the suggestion (if pending), removes ratings/tips for the shop, " +
         "and notifies the suggester. The map pin clears after the next tile republish.",
@@ -692,28 +706,25 @@ $("list").addEventListener("click", async (ev) => {
     const verb = d.approve ? "APPROVE" : "REJECT";
     const notes = window.prompt(verb + " this claim — optional admin note (Cancel aborts):", "");
     if (notes === null) return;
-    act("admin_decide_claim", { p_id: d.id, p_approve: !!d.approve, p_notes: notes || null });
+    act("decide_claim", { id: d.id, approve: !!d.approve, notes: notes || null });
   } else if (d.act === "report") {
-    act("admin_resolve_reports", { p_target_kind: d.kind, p_target_id: d.id, p_hide: !!d.hide },
+    act("resolve_reports", { target_kind: d.kind, target_id: d.id, hide: !!d.hide },
         d.hide ? "Hide this content and resolve all its open reports?"
                : "Keep (un-hide) this content and resolve all its open reports?");
   } else if (d.act === "bug") {
-    act("admin_set_bug_report_status", { p_id: d.id, p_status: d.status });
+    act("set_bug_status", { id: d.id, status: d.status });
   } else if (d.act === "shot") {
-    // screenshot_url is a public-style URL into the PRIVATE driver-screenshots
-    // bucket — extract the object path and sign it (admin storage policy).
     const m = /driver-screenshots\/(.+)$/.exec(d.url);
     if (!m) { toast("Unrecognized screenshot URL"); return; }
     b.disabled = true;
-    const { data, error } = await db.storage.from("driver-screenshots")
-      .createSignedUrl(decodeURIComponent(m[1]), 3600);
-    b.disabled = false;
-    if (error) { toast(error.message); return; }
+    const path = decodeURIComponent(m[1]);
     const img = document.createElement("img");
     img.className = "shot";
-    img.src = data.signedUrl;
+    img.alt = "Screenshot";
+    img.src = API + "/shot?path=" + encodeURIComponent(path);
+    img.onerror = () => { toast("Failed to load screenshot"); b.disabled = false; };
+    img.onload = () => { b.remove(); };
     b.closest(".card").appendChild(img);
-    b.remove();
   }
 });
 
