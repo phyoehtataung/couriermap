@@ -71,4 +71,4 @@ When we make a material change we will bump the policy version and re-prompt you
 
 ## Contact
 
-Questions, complaints, or data-rights requests: **couriermap2026@gmail.com**.
+Questions, complaints, or data-rights requests: **support@courier-map.com**.
