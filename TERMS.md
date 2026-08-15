@@ -62,4 +62,4 @@ We will bump the Terms version and re-prompt you on next launch when we make a m
 
 ## Contact
 
-**couriermap2026@gmail.com**
+**support@courier-map.com**
