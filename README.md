@@ -3,24 +3,21 @@
 **A driver-only shop rating map for delivery couriers.**
 
 CourierMap is a map app with a shop rating system that drivers can
-contribute to — separate from Google Maps. 
+contribute to; separate from main-stream map apps such as Google Maps or Apple Maps. 
 
-The idea is simple: when you are at a
-pickup, you can see what other drivers have said about a shop, so you can decide whether
-to **wait or cancel** based on real history which is the rating based on other drivers instead of guessing.
+The idea is simple: when you are at a shop for pickup, you can see what other drivers have said about the shop, so you can decide whether
+to **wait or cancel** instead of guessing based on real history which is the rating based on other drivers.
 
 This is especially useful when you're new to an area and don't yet know which shops are
 reliable and which ones will leave you waiting, especially if you are in a rush to complete a quest.
 
 ---
 
-## Why CourierMap?
-
 When you arrive at a new shop, you can pull up CourierMap and instantly see:
 
-- ⭐ **Average wait time, ratings & comments** left by other drivers — so if a place is known for
+- ⭐ **Average wait time, ratings & comments** left by other drivers so if a place is known for
   long waits, you can cancel and protect a quest or leave your own review so that other drivers can see and adjust their hourly target and quests instead of getting stuck.
-- 📍 **Pickup tips** — driver notes on navigating tricky locations: multi-level malls,
+- 📍 **Pickup tips** driver notes on navigating tricky locations: multi-level malls,
   hidden takeaway-only spots, where to actually park, which entrance to use.
 
 It's the kind of local knowledge drivers usually trade in group chats now collected in one
@@ -31,9 +28,7 @@ place, pinned to the actual shop on a map.
 ## Who it's for
 
 Food delivery drivers (Uber, DoorDash, HungryPanda, and others) who want to make
-faster, smarter decisions at pickup. 
-
-Ratings are contributed by drivers, for drivers.
+faster, smarter decisions at pickup. Ratings are contributed by drivers, for drivers.
 
 ---
 
