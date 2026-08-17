@@ -1,7 +1,7 @@
 # CourierMap Privacy Policy
 
-**Effective date:** 21 July 2026
-**Version:** 6 (beta)
+**Effective date:** 17 August 2026
+**Version:** 7 (beta)
 
 This Privacy Policy explains what information CourierMap ("we", "us") collects, how we use it, and the choices you have. By using the app you confirm that you have read and understood this policy.
 
@@ -13,7 +13,7 @@ You can open the app and browse the map, shop pages, reviews feed, and comments 
 
 - **Account:** your email address and a hashed password (managed by Supabase Auth). If you sign in with Google we receive your email and Google account ID only.
 - **Display name and public username (@handle):** a starter @handle is generated for you automatically when you sign up — it may be derived from your display name or the local part of your email address — and you can change it. Your display name and @handle are shown publicly next to your contributions.
-- **Driver verification:** a screenshot you upload of your rideshare or delivery driver profile and the driver name parsed from it. When you start verification we request access to your device's photo library (via the operating system's standard permission prompt) so you can pick the screenshot; we only read the image you select. Screenshots are stored in a private, owner-only Supabase Storage bucket. We use Google Cloud Vision (running inside our Supabase Edge Function) to OCR the screenshot; the image is sent to Google Cloud Vision solely for that purpose and is not retained by Google for training. We then send only the short name text extracted by the OCR (never the screenshot) to Google's Gemini AI to confirm it looks like a person's name rather than an app menu label.
+- **Driver verification:** a screenshot you upload of your rideshare or delivery driver profile and the driver name parsed from it. When you start verification we open the operating system's photo picker so you can choose a screenshot; we only receive the image you select, and we do not keep standing access to your photo library, camera, microphone, or device storage. Screenshots are stored in a private, owner-only Supabase Storage bucket. We use Google Cloud Vision (running inside our Supabase Edge Function) to OCR the screenshot; the image is sent to Google Cloud Vision solely for that purpose and is not retained by Google for training. We then send only the short name text extracted by the OCR (never the screenshot) to Google's Gemini AI to confirm it looks like a person's name rather than an app menu label.
 - **Device location (on-device only):** when you tap the Locate Me button we request your device location through the operating system's standard permission prompt and use the coordinate to centre the map on your position. The coordinate is used on-device only and is not transmitted to our servers or any third party.
 - **Contributions:** ratings, comments, pickup guides, replies, up/down votes, platform tags, place suggestions and bug reports you create are stored under your account. Most of these — including your ratings, comments, pickup guides and replies — are public: they appear, alongside your display name and @handle, in a global feed and on the relevant shop pages, visible to all users (including guests browsing without an account).
 - **Device-local data:** your last map centre, a cached shops-map tile pointer, theme preference and other UI settings stored locally on the device via AsyncStorage and the device filesystem. These do not leave the device.
@@ -21,6 +21,7 @@ You can open the app and browse the map, shop pages, reviews feed, and comments 
 ## What we do NOT collect
 
 - We do not send your GPS coordinates to our servers. The Locate-Me button runs entirely on-device.
+- We do not access your camera or microphone, and we do not request standing access to your photo library or device storage.
 - We do not run third-party analytics, advertising SDKs, or crash reporters in the beta build.
 - We do not sell your data.
 
