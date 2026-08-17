@@ -1,0 +1,33 @@
+title: CourierMap
+description: A driver-only shop rating map for delivery couriers.
+url: https://courier-map.com
+logo: /assets/icon.png
+lang: en
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+exclude:
+  - README.md
+defaults:
+  - scope:
+      path: "admin"
+    values:
+      layout: none
+  - scope:
+      path: "auth"
+    values:
+      layout: none
+  - scope:
+      path: "PRIVACY_POLICY.md"
+    values:
+      layout: default
+      title: CourierMap Privacy Policy
+  - scope:
+      path: "TERMS.md"
+    values:
+      layout: default
+      title: CourierMap Terms of Service
